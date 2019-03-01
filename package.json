@@ -1,0 +1,43 @@
+{
+	"name": "horizonchart",
+	"version": "0.0.1",
+	"description": "Horizon Chart",
+	"keywords": [
+		"Horizon Chart"
+	],
+	"homepage": "https://namwkim.github.com/horizonchart",
+	"author": {
+		"name": "Nam Wook Kim",
+		"url": "www.namwkim.org"
+	},
+	"main": "./src/horizonchart.js",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/namwkim/horizonchart.git"
+	},
+	"license": "MIT",
+	"scripts": {
+		"start": "npm run server & npm run watch",
+		"server": "http-server -p 9000",
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"build": "rollup -c",
+		"watch": "rollup -c -w"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.3.4",
+		"@babel/preset-env": "^7.3.4",
+		"babel-core": "^6.26.3",
+		"http-server": "^0.11.1",
+		"rollup": "^1.4.0",
+		"rollup-plugin-babel": "^4.3.2",
+		"rollup-plugin-commonjs": "^9.2.1",
+		"rollup-plugin-node-resolve": "^4.0.1"
+	},
+	"dependencies": {
+		"d3-axis": "^1.0.12",
+		"d3-collection": "^1.0.7",
+		"d3-scale": "^2.2.2",
+		"d3-selection": "^1.4.0",
+		"d3-shape": "^1.3.4"
+	}
+}
