@@ -1,7 +1,8 @@
 <html>
 	<head>
 			<script src="./d3.min.js"></script>
-			<script src="../dist/ridgeplot.js"></script>
+            <script src="../dist/ridgeplot.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.11/lodash.min.js"></script>
 			<script type="module">
 				let visdata = JSON.parse(localStorage.getItem('visdata'));
 				if (visdata){
@@ -31,13 +32,17 @@
 						// let max = d3.max(data.columns.map(key=>{
 						// 	return d3.max(data.map(function(d){  return +d[key]; }));							
 						// }));
-						// console.log('min, max', min, max);
-						console.time('kde');
+                        // console.log('min, max', min, max);
+                        
+                        
+						console.time('kde_sampled');
 						let x = d3.scaleLinear().domain([0, 65535]);
 						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
 						
 						let allDensity = data.columns.map(key=>{
-							let density =  kde( data.map(function(d){  return d[key]; }) );
+                            let values = data.map(function(d){  return +d[key]; });
+                            console.log(key, d3.extent(values));
+							let density =  kde( _.sampleSize(values,parseInt(values.length/100)) );
 							return {key, density};
 						})
 						let visdata =  {
@@ -51,7 +56,7 @@
 						console.log('saving data...', visdata);
 						// window.localStorage.setItem('visdata', JSON.stringify(visdata));
 						visualize(visdata);
-						console.timeEnd('kde');
+						console.timeEnd('kde_sampled');
 							
 					})
 

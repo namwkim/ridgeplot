@@ -1,19 +1,19 @@
 {
-	"name": "horizonchart",
+	"name": "ridgeplot",
 	"version": "0.0.1",
-	"description": "Horizon Chart",
+	"description": "Ridge Plot",
 	"keywords": [
-		"Horizon Chart"
+		"Ridge Plot"
 	],
-	"homepage": "https://namwkim.github.com/horizonchart",
+	"homepage": "https://namwkim.github.com/ridgeplot",
 	"author": {
 		"name": "Nam Wook Kim",
 		"url": "www.namwkim.org"
 	},
-	"main": "./src/horizonchart.js",
+	"main": "./src/ridgeplot.js",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/namwkim/horizonchart.git"
+		"url": "https://github.com/namwkim/ridgeplot.git"
 	},
 	"license": "MIT",
 	"scripts": {
@@ -27,6 +27,7 @@
 		"@babel/core": "^7.3.4",
 		"@babel/preset-env": "^7.3.4",
 		"babel-core": "^6.26.3",
+		"d3-format": "^1.3.2",
 		"http-server": "^0.11.1",
 		"rollup": "^1.4.0",
 		"rollup-plugin-babel": "^4.3.2",
@@ -34,9 +35,11 @@
 		"rollup-plugin-node-resolve": "^4.0.1"
 	},
 	"dependencies": {
+		"d3-array": "^2.0.3",
 		"d3-axis": "^1.0.12",
 		"d3-collection": "^1.0.7",
 		"d3-scale": "^2.2.2",
+		"d3-scale-chromatic": "^1.3.3",
 		"d3-selection": "^1.4.0",
 		"d3-shape": "^1.3.4"
 	}

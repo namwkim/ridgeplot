@@ -1,11 +1,11 @@
 <html>
 	<head>
-			<script src="./d3.min.js"></script>
-			<script src="../dist/ridgeplot.js"></script>
+            <script src="./d3.min.js"></script>
+            <script src="../dist/ridgeplot.js"></script>
 			<script type="module">
-				let visdata = JSON.parse(localStorage.getItem('visdata'));
+				let visdata = JSON.parse(localStorage.getItem('visdata_histogram'));
 				if (visdata){
-					visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
+					
 			
 					console.log('used cached data...', visdata);
 					visualize(visdata);
@@ -31,13 +31,17 @@
 						// let max = d3.max(data.columns.map(key=>{
 						// 	return d3.max(data.map(function(d){  return +d[key]; }));							
 						// }));
-						// console.log('min, max', min, max);
-						console.time('kde');
+                        // console.log('min, max', min, max);
+                        console.time('histogram');
 						let x = d3.scaleLinear().domain([0, 65535]);
-						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
-						
+						// let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
+						let binning = d3.histogram()
+                            .domain(x.domain())
+                            .thresholds(x.ticks(40));
+                        
 						let allDensity = data.columns.map(key=>{
-							let density =  kde( data.map(function(d){  return d[key]; }) );
+                            let bins =  binning( data.map(function(d){  return +d[key]; }) );
+                            let density = bins.map((d,i)=>[(d.x1-d.x0)/2+d.x0,d.length]);
 							return {key, density};
 						})
 						let visdata =  {
@@ -46,12 +50,12 @@
 							values: density.map(d =>d[1])
 							})),
 							bins:allDensity[0].density.map(d=>d[0])
-						};
-						visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
+                        };
+                        visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
 						console.log('saving data...', visdata);
-						// window.localStorage.setItem('visdata', JSON.stringify(visdata));
-						visualize(visdata);
-						console.timeEnd('kde');
+						// window.localStorage.setItem('visdata_histogram', JSON.stringify(visdata));
+                        visualize(visdata);
+                        console.timeEnd('histogram');
 							
 					})
 
