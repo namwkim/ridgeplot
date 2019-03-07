@@ -40,7 +40,7 @@
 							let density =  kde( data.map(function(d){  return d[key]; }) );
 							return {key, density};
 						})
-						let visdata =  {
+						visdata =  {
 							series: allDensity.map(({key, density}) => ({
 							name: key,
 							values: density.map(d =>d[1])
@@ -49,13 +49,17 @@
 						};
 						visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
 						console.log('saving data...', visdata);
-						// window.localStorage.setItem('visdata', JSON.stringify(visdata));
+						window.localStorage.setItem('visdata', JSON.stringify(visdata));
 						visualize(visdata);
 						console.timeEnd('kde');
 							
 					})
 
 				}
+				window.addEventListener("resize", ()=>{
+					visualize(visdata);
+				}, false);
+				
 				function visualize(visdata){
 					// console.log('visdata', data, visdata);
 					let plot = ridgeplot();

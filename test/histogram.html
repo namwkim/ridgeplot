@@ -53,7 +53,7 @@
                         };
                         visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
 						console.log('saving data...', visdata);
-						// window.localStorage.setItem('visdata_histogram', JSON.stringify(visdata));
+						window.localStorage.setItem('visdata_histogram', JSON.stringify(visdata));
                         visualize(visdata);
                         console.timeEnd('histogram');
 							

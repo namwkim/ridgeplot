@@ -16,7 +16,10 @@ export default {
         'd3-scale':'d3',
         'd3-collection':'d3',
         'd3-array':'d3',
-        'd3-scale-chromatic':'d3'	
+        'd3-scale-chromatic':'d3',
+        'd3-format':'d3',
+        'd3-brush':'d3',
+        'd3-dispatch':'d3'
       
       }
   },
@@ -39,7 +42,10 @@ export default {
     'd3-scale',
     'd3-collection',
     'd3-array',
-    'd3-scale-chromatic'
+    'd3-scale-chromatic',
+    'd3-format',
+    'd3-brush',
+    'd3-dispatch'
 
   ]
 

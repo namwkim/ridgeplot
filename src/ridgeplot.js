@@ -1,10 +1,12 @@
-// import {select} from 'd3-selection';
+import {event, select} from 'd3-selection';
 // import {schemeBlues} from 'd3-scale-chromatic';
-import {scaleTime, scalePoint, scaleLinear} from 'd3-scale';
+import {scalePoint, scaleLinear} from 'd3-scale';
 import {axisLeft, axisBottom} from 'd3-axis';
 import {max, extent, bisectLeft} from 'd3-array';
-import {area, curveCardinal} from 'd3-shape';
+import {area, line, curveLinear} from 'd3-shape';
 import {format} from 'd3-format';
+import {brushX, brushSelection} from 'd3-brush';
+import {dispatch} from 'd3-dispatch';
 
 export default function(){
     // initialize
@@ -24,12 +26,25 @@ export default function(){
         y = scalePoint(),
         z = scaleLinear(),
         ridge = area()
-            .curve(curveCardinal)
+            .curve(curveLinear)
             .defined(d => !isNaN(d))
             .x((d, i) => x(data.bins[i]))
             .y0(0)
             .y1(d => z(d)),
-        foci=null;
+        crossridge = line()
+            .x(d=>x(d.value))
+            .y(d=>y(d.name)),
+        foci=null, 
+        hoverEnabled = false,
+        brushEnabled = true,
+        onBrushMove = null,
+        onBrushEnd = null,
+        listeners = dispatch('brushmove', 'brushend'),
+        brush = brushX()
+            .on("brush", brushmove)
+            .on("end", brushend),
+        highlights = null,
+        handle = null;
 
 
 
@@ -38,7 +53,7 @@ export default function(){
         // let container = select(selection);
         data = selection.datum();
 
-        console.log(data, selection);
+        // console.log(data, selection);
         if (!data){
             return;
         }
@@ -50,8 +65,10 @@ export default function(){
             
             svg.append("rect")
                 .attr("class", "overlay")
-                .attr('fill', 'none')
-                .attr('pointer-events', 'all');
+                .attr('fill', 'none');
+
+            svg.append('g')
+                
 		}
         const visarea = svg.select('.visarea');
         const overlay = svg.select('.overlay');
@@ -63,7 +80,8 @@ export default function(){
             
         // visarea.attr('transform',
         //     'translate(' + margin.left + ',' + margin.top + ')');
-        console.log(margin, width, height)
+        // console.log(margin, width, height)
+        //save prev state if any
         // scale
         x.domain(extent(data.bins))
             .range([margin.left, width - margin.right]);
@@ -73,14 +91,18 @@ export default function(){
             .range([0, -overlap * y.step()]);
         
         
-        console.log('x,y,z',x.domain(),y.domain(),z.domain());
-        const group = visarea.selectAll("g")
+        // console.log('x,y,z',x.domain(),y.domain(),z.domain());
+        const group = visarea.selectAll(".group")
             .data(data.series)
             .join("g")
+            .attr('class', 'group')
             .attr("transform", d => `translate(0,${y(d.name) + 1})`);
                 // .attr("transform", (d, i) => `translate(0,${i * (step + 1) + margin.top})`);
         
-        group.append("path")
+        group.selectAll('.area')
+            .data(d=>[d])
+            .join("path")
+            .attr('class', 'area')
             .attr("fill", "#ddd")
             .attr("d", d=>{
                 // console.log(d.values);
@@ -88,33 +110,83 @@ export default function(){
             });
         
         let line = ridge.lineY1();
-        group.append("path")
+        group.selectAll('.line')
+            .data(d=>[d])
+            .join("path")
+            .attr('class', 'line')
             .attr("fill", "none")
             .attr("stroke", "black")
             .attr("d", d => line(d.values));
-
-        foci = group.append('g')
+        
+        if (group.select('.focus').empty() && hoverEnabled){
+            foci = group.append('g')
             .attr("class", "focus")
             .style("display", "none");
         
-        console.log(foci);
-        foci.append("circle")
-            .attr('fill', '#757575')
-            .attr("r", 2);
-      
-        foci.append("text")
-            .attr("x", 9)
-            .attr("font-size", 10)
-            .attr("paint-order","stroke")
-            .attr('stroke', 'white')
-            .attr('fill', 'black')
-            .attr('stroke-width', '3')
-            .attr('stroke-linecap', 'round')
-            .attr("font-family", "sans-serif")
-            .attr("dy", ".35em");
-      		
-      
+            // console.log(foci);
+            foci.append("circle")
+                .attr('fill', '#757575')
+                .attr("r", 2);
+        
+            foci.append("text")
+                .attr("x", 9)
+                .attr("font-size", 10)
+                .attr("paint-order","stroke")
+                .attr('stroke', 'white')
+                .attr('fill', 'black')
+                .attr('stroke-width', '3')
+                .attr('stroke-linecap', 'round')
+                .attr("font-family", "sans-serif")
+                .attr("dy", ".35em");	
 
+            overlay.attr('pointer-events', 'all');
+        }else if (!hoverEnabled){
+            group.select('.focus').remove();
+            overlay.attr('pointer-events', 'none');
+        }
+  
+        // visualize highlights
+        if (highlights){
+            visarea.selectAll('.crossridge')
+                .data(highlights)
+                .join('path')
+                .attr('class', 'crossridge')
+                .attr("fill", "none")
+                .attr("stroke", "#FF3D00")
+                .attr("d", d => crossridge(d));
+        }
+        // brush
+        if (brushEnabled && group.select('.brush').empty()){
+            group.append('g')
+                .attr('class', 'brush');
+        }else if (!brushEnabled){
+            group.select('.brush').remove();
+        }
+
+        brush.extent([[margin.left, -overlap * y.step()], [width, 0]]);
+        
+        group.select('.brush').call(brush);
+
+        handle = group.select('.brush')
+            .selectAll(".handle--custom")
+            .data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
+            .join('path')
+            .attr("class", "handle--custom")
+            .attr('display', 'none')
+            .attr("cursor", "ew-resize")
+            .attr('stroke', '#9E9E9E')
+            .attr("d", function(d) {
+                var e = +(d.type == "e"),
+                    dx = e ? 1 : -1,
+                    dy = overlap*y.step();
+                return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
+            });
+  
+        group.select('.brush').each(function(d){
+            if (this.__brush_selection){
+                brush.move(select(this),this.__brush_selection.map(x));
+            }
+        });
         //axis
         let yAxisGroup = visarea.select('.y.axis');
 		if (yAxisGroup.empty()) {
@@ -153,7 +225,26 @@ export default function(){
         height = value;
         return chart;
     };
-
+    chart.hoverEnabled = function(value){
+        if (!arguments.length) return hoverEnabled;
+        hoverEnabled = value;
+        return chart;
+    }
+    chart.highlights = function(value){
+        if (!arguments.length) return highlights;
+        highlights = value;
+        return chart;
+    }
+    chart.brushEnabled = function(value){
+        if (!arguments.length) return brushEnabled;
+        brushEnabled = value;
+        return chart;
+    }
+    chart.on = function() {
+        var value = listeners.on.apply(listeners, arguments);
+        return value === listeners ? chart : value;
+    };
+    
     function mousemove(){
         var x0 = x.invert(d3.mouse(this)[0]),
         i = bisectLeft(data.bins, x0, 1),
@@ -165,6 +256,39 @@ export default function(){
         foci.select("text").text(d=>{
             return format(',')(d.values[di]);
         });
+    }
+    function brushmove(row){
+        let selection = event.selection;
+        if (selection==null){
+            handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
+        }else{
+            handle.filter(d=>d.parent.name==row.name).attr('display', null)
+                .attr('transform', (d,i)=>{
+                    return `translate(${selection[i]},${-2*overlap * y.step()})`
+                });
+        }
+        listeners.apply("brushmove", this, [event, ...arguments]);
+        // console.log('brushmove');
+    }
+    function brushend(row){
+        
+        let selection = event.selection;
+        // console.log('brushend', row, selection);
+        if (selection==null){
+            // console.log('nulllllll')
+            handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
+        }else{
+            handle.filter(d=>d.parent.name==row.name).attr('display', null)
+                .attr('transform', function(d,i){
+                    // console.log(this);
+                    // console.log(d);
+                    return `translate(${selection[i]},${-2*overlap * y.step()})`
+                });
+        }
+        listeners.apply("brushend", this, [event, ...arguments]);
+
+        //save brush state
+        this.__brush_selection = brushSelection(this).map(x.invert);
     }
 
 

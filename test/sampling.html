@@ -2,13 +2,19 @@
 	<head>
 			<script src="./d3.min.js"></script>
             <script src="../dist/ridgeplot.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.11/lodash.min.js"></script>
+			<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.11/lodash.min.js"></script>
+			<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.css"/>
+			<script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+
 			<script type="module">
 				let visdata = JSON.parse(localStorage.getItem('visdata'));
+				let plot = ridgeplot();
+				let cells = JSON.parse(localStorage.getItem('cells'));
 				if (visdata){
-					visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
-			
-					console.log('used cached data...', visdata);
+					
+					cells = _.sampleSize(cells, 4);
+					// cells.forEach(cell=>cell.forEach(d=>d.value=+d.value));
+					console.log('used cached data...', visdata, cells);
 					visualize(visdata);
 				}else{
 					const promise = d3.csv("./segResultsRF.csv");//, ({name, date, total_1, total_2}) => ({name, date: date * 1000, value: +total_1 + +total_2}));
@@ -34,7 +40,11 @@
 						// }));
                         // console.log('min, max', min, max);
                         
-                        
+						cells = _.sampleSize(data, 10);
+						cells = cells.map(cell=>Object.keys(cell).map(key=>{
+							let name = key.slice(0,key.length-6);
+							return {name, value:+cell[key]};
+						}));
 						console.time('kde_sampled');
 						let x = d3.scaleLinear().domain([0, 65535]);
 						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
@@ -45,7 +55,7 @@
 							let density =  kde( _.sampleSize(values,parseInt(values.length/100)) );
 							return {key, density};
 						})
-						let visdata =  {
+						visdata =  {
 							series: allDensity.map(({key, density}) => ({
 							name: key,
 							values: density.map(d =>d[1])
@@ -54,37 +64,44 @@
 						};
 						visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
 						console.log('saving data...', visdata);
-						// window.localStorage.setItem('visdata', JSON.stringify(visdata));
+						window.localStorage.setItem('visdata', JSON.stringify(visdata));
+						window.localStorage.setItem('cells', JSON.stringify(cells));
 						visualize(visdata);
 						console.timeEnd('kde_sampled');
 							
 					})
 
 				}
+				window.addEventListener("resize", ()=>{
+					visualize(visdata);
+				}, false);
+
 				function visualize(visdata){
 					// console.log('visdata', data, visdata);
-					let plot = ridgeplot();
+					
 					// console.log(plot);
 					let container = d3.select(".container");
 					
 					let rect = container.node().getBoundingClientRect();
 					// console.log(container,rect);
-					
+
+					plot.width(rect.width)
+						.highlights(cells);
 					container.datum(visdata)
-						.call(plot.width(rect.width));
+						.call(plot);
 				}
 			// This is what I need to compute kernel density estimation
 			function kernelDensityEstimator(kernel, X) {
-			return function(V) {
-				return X.map(function(x) {
-				return [x, d3.mean(V, function(v) { return kernel(x - v); })];
-				});
-			};
+				return function(V) {
+					return X.map(function(x) {
+					return [x, d3.mean(V, function(v) { return kernel(x - v); })];
+					});
+				};
 			}
 			function kernelEpanechnikov(k) {
-			return function(v) {
-				return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
-			};
+				return function(v) {
+					return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
+				};
 			}
 		</script>
 	</head>
