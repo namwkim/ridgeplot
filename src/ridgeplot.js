@@ -170,17 +170,19 @@ export default function(){
         handle = group.select('.brush')
             .selectAll(".handle--custom")
             .data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
-            .join('path')
+            .join('line')
             .attr("class", "handle--custom")
             .attr('display', 'none')
             .attr("cursor", "ew-resize")
-            .attr('stroke', '#9E9E9E')
-            .attr("d", function(d) {
-                var e = +(d.type == "e"),
-                    dx = e ? 1 : -1,
-                    dy = overlap*y.step();
-                return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
-            });
+            .attr('stroke', '#757575')
+            .attr('y0', 1)
+            .attr('y1', -overlap*y.step()+1);
+            // .attr("d", function(d) {
+            //     var e = +(d.type == "e"),
+            //         dx = e ? 1 : -1,
+            //         dy = overlap*y.step();
+            //     return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
+            // });
   
         group.select('.brush').each(function(d){
             if (this.__brush_selection){
@@ -264,7 +266,7 @@ export default function(){
         }else{
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', (d,i)=>{
-                    return `translate(${selection[i]},${-2*overlap * y.step()})`
+                    return `translate(${selection[i]},${0})`
                 });
         }
         listeners.apply("brushmove", this, [event, ...arguments]);
@@ -282,13 +284,14 @@ export default function(){
                 .attr('transform', function(d,i){
                     // console.log(this);
                     // console.log(d);
-                    return `translate(${selection[i]},${-2*overlap * y.step()})`
+                    return `translate(${selection[i]},${0})`
                 });
+            //save brush state
+            this.__brush_selection = selection.map(x.invert);
         }
         listeners.apply("brushend", this, [event, ...arguments]);
 
-        //save brush state
-        this.__brush_selection = brushSelection(this).map(x.invert);
+        
     }
 
 

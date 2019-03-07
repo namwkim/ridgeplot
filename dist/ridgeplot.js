@@ -129,12 +129,13 @@
           parent: d,
           type: "e"
         }];
-      }).join('path').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize").attr('stroke', '#9E9E9E').attr("d", function (d) {
-        var e = +(d.type == "e"),
-            dx = e ? 1 : -1,
-            dy = overlap * y.step();
-        return "M" + .5 * dx + "," + dy + "A6,6 0 0 " + e + " " + 6.5 * dx + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + .5 * dx + "," + 2 * dy + "Z" + "M" + 2.5 * dx + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + 4.5 * dx + "," + (dy + 8) + "V" + (2 * dy - 8);
-      });
+      }).join('line').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize").attr('stroke', '#757575').attr('y0', 1).attr('y1', -overlap * y.step() + 1); // .attr("d", function(d) {
+      //     var e = +(d.type == "e"),
+      //         dx = e ? 1 : -1,
+      //         dy = overlap*y.step();
+      //     return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
+      // });
+
       group.select('.brush').each(function (d) {
         if (this.__brush_selection) {
           brush.move(d3Selection.select(this), this.__brush_selection.map(x));
@@ -225,7 +226,7 @@
         handle.filter(function (d) {
           return d.parent.name == row.name;
         }).attr('display', null).attr('transform', function (d, i) {
-          return "translate(".concat(selection[i], ",").concat(-2 * overlap * y.step(), ")");
+          return "translate(".concat(selection[i], ",", 0, ")");
         });
       }
 
@@ -246,13 +247,13 @@
         }).attr('display', null).attr('transform', function (d, i) {
           // console.log(this);
           // console.log(d);
-          return "translate(".concat(selection[i], ",").concat(-2 * overlap * y.step(), ")");
-        });
+          return "translate(".concat(selection[i], ",", 0, ")");
+        }); //save brush state
+
+        this.__brush_selection = selection.map(x.invert);
       }
 
-      listeners.apply("brushend", this, [d3Selection.event].concat(Array.prototype.slice.call(arguments))); //save brush state
-
-      this.__brush_selection = d3Brush.brushSelection(this).map(x.invert);
+      listeners.apply("brushend", this, [d3Selection.event].concat(Array.prototype.slice.call(arguments)));
     }
 
     return chart;
