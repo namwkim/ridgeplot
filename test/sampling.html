@@ -1,24 +1,34 @@
 <html>
 	<head>
 			<script src="./d3.min.js"></script>
-            <script src="../dist/ridgeplot.js"></script>
+			<script src="../dist/ridgeplot.js"></script>
 			<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.11/lodash.min.js"></script>
 			<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.css"/>
 			<script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
 
 			<script type="module">
+				import picker from './huepicker.js';
+
 				let visdata = JSON.parse(localStorage.getItem('visdata'));
 				let plot = ridgeplot();
+				plot.on('brushmove',brushmove)
+					.on('brushend', brushend);
+				let colorPicker = picker();
+				let colorTransferHandle = null;
+
+				colorPicker.on('handlemove', handlemove)
+					.on('handleend', handleend)
+					.on('close', ()=>colorTransferHandle=null);
+				d3.select(document.body).call(colorPicker);//add it to body
 				let cells = JSON.parse(localStorage.getItem('cells'));
 				if (visdata){
-					
-					cells = _.sampleSize(cells, 4);
+					cells = _.sampleSize(cells, 5);
 					// cells.forEach(cell=>cell.forEach(d=>d.value=+d.value));
 					console.log('used cached data...', visdata, cells);
 					visualize(visdata);
 				}else{
 					const promise = d3.csv("./segResultsRF.csv");//, ({name, date, total_1, total_2}) => ({name, date: date * 1000, value: +total_1 + +total_2}));
-					console.log(promise);
+					// console.log(promise);
 					promise.then((data)=>{
 						console.log(data);
 						// const dates = d3.nest()
@@ -38,21 +48,22 @@
 						// let max = d3.max(data.columns.map(key=>{
 						// 	return d3.max(data.map(function(d){  return +d[key]; }));							
 						// }));
-                        // console.log('min, max', min, max);
-                        
+						// console.log('min, max', min, max);
+						let columns = data.columns;
+                        data = _.sampleSize(data, data.length/100);
 						cells = _.sampleSize(data, 10);
 						cells = cells.map(cell=>Object.keys(cell).map(key=>{
 							let name = key.slice(0,key.length-6);
 							return {name, value:+cell[key]};
 						}));
 						console.time('kde_sampled');
-						let x = d3.scaleLinear().domain([0, 65535]);
+						let x = d3.scaleLinear().domain([0, 65535]).nice(40);
 						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
 						
-						let allDensity = data.columns.map(key=>{
+						let allDensity = columns.map(key=>{
                             let values = data.map(function(d){  return +d[key]; });
                             console.log(key, d3.extent(values));
-							let density =  kde( _.sampleSize(values,parseInt(values.length/100)) );
+							let density =  kde( values,parseInt(values.length));
 							return {key, density};
 						})
 						visdata =  {
@@ -89,7 +100,74 @@
 						.highlights(cells);
 					container.datum(visdata)
 						.call(plot);
+					// add group
+					d3.selectAll('.group')
+						.selectAll(".color-transfer")
+						.data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
+						.join('rect')
+						.attr("class", "color-transfer")
+						.attr('display', 'none')
+						.attr("cursor", "pointer")
+						.attr('stroke', 'white')
+						.attr('fill', 'black')
+						.attr('width', 10)
+						.attr('height', 10)
+						.attr('rx', 2)
+						.attr('ry', 2)
+						.attr('x',d=>d.type=='w'?-15:5)
+						.attr('y', -plot.overlap()*plot.y().step()/2-5)
+						.on('mouseup', onShowColorPicker);
 				}
+			function brushmove(range, pixelRange, row){
+				if (pixelRange){
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==row.name).attr('display', null)
+						.attr('transform', function(d,i){
+							// console.log(this);
+							// console.log(d);
+							return `translate(${pixelRange[i]},${0})`});
+				}else{//remove
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==row.name).attr('display', 'none')
+				}
+				
+				// d3.select('.picker-container')
+				// 	.style('left', d3.event.sourceEvent.clientX+'px')
+				// 	.style('top', d3.event.sourceEvent.clientY+'px');
+
+			}
+			function brushend(range, pixelRange, row){
+				console.log('brush-end', pixelRange);
+				if (pixelRange){
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==row.name).attr('display', null)
+						.attr('transform', function(d,i){
+							// console.log(this);
+							// console.log(d);
+							return `translate(${pixelRange[i]},${0})`});
+				}else{//remove
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==row.name).attr('display', 'none')
+				}
+				
+				// d3.select('.picker-container')
+				// 	.style('left', d3.event.sourceEvent.clientX+'px')
+				// 	.style('top', d3.event.sourceEvent.clientY+'px');
+			}
+			function handlemove(color, x){
+				console.log('handlemove', color, x);
+			}
+			function handleend(color, x){
+				console.log('handleend', color, x);
+				colorTransferHandle.style('fill', color);
+			}
+			function onShowColorPicker(){
+				colorTransferHandle = d3.select(this);
+				let color = colorTransferHandle.style('fill');
+				let hsl = d3.hsl(color);
+				colorPicker.set(hsl)
+				colorPicker.show(d3.event.clientX, d3.event.clientY);
+			}
 			// This is what I need to compute kernel density estimation
 			function kernelDensityEstimator(kernel, X) {
 				return function(V) {
@@ -103,10 +181,96 @@
 					return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
 				};
 			}
+			
+			// var rainbow = d3.scaleSequential(function(t) {
+			// 	return d3.hsl(t * 360, 1, 0.5) + "";
+			// });
+
+			// // let toColor = d3.scaleSe
+			// let pickerWidth = 120;
+			// d3.select('.picker')
+			// 	.style('width', `${pickerWidth}px`)
+			// d3.select('.picker-handle')
+			// 	.call(d3.drag()
+			// 	.on("drag", ()=>updateHandle(d3.event.x,pickerWidth)));
+			// d3.select('.picker-bar')
+			// 	.on('mousedown', function(){
+			// 		let x = d3.mouse(this)[0];
+			// 		updateHandle(x,pickerWidth);
+			// 	});
+
+			// function updateHandle(x, xmax){
+			// 	if (x<0 || x>xmax){
+			// 		return;
+			// 	}
+			// 	let hue = rainbow(x/xmax);
+			// 		d3.select('.picker-handle')
+			// 			.style('left', `${x}`)
+			// 			.style('background-color', hue);
+			// }
+			// let initX = parseInt(d3.select('.picker-handle')
+			// 		.style('left'));
+			// updateHandle(initX, pickerWidth);
 		</script>
+		<!-- <style>
+			.picker-container{
+				/* width: 200px; */
+				position: fixed;
+				padding:5px;
+				padding-left:15px;
+				box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.28);
+				transform: translate(-50%,0);
+				background-color: #fff;
+				display: flex;
+    			align-items: center;
+			}
+			.picker{
+				position: relative;
+				/* border:1px solid gray; */
+			}
+			.picker-bar{
+				
+				width:100%;
+				height:6px;
+
+				border-radius: 4px;
+				background: linear-gradient(to right,red,#ff0,#0f0,#0ff,#00f,#f0f,red);
+				/* transform: translate(0,-50%); */
+			}
+			.picker-handle{
+				cursor: pointer;
+				position: absolute;
+				transform: translate(-50%,-50%);
+				top:50%;
+				left:0;
+				width:15px;
+				height:15px;
+				border-radius: 50%;
+				/* background-color:gray; */
+				background-color: white;
+				border:2px solid white;
+				
+			}
+			.picker-container .close{
+				cursor: pointer;
+				font-family: Arial, Helvetica, sans-serif;
+				font-size: 12px;
+				color: #757575;
+				margin-left:10px;
+				padding:5px;
+			}
+			.picker-container .close:hover{
+				background-color: #eee;
+			}
+		</style> -->
 	</head>
 	<body>
+			<iframe src="https://drawit.mucollective.co/vis/GGsazOtC4EU6G3jnHRy0Ziu590g1/-L_VbRpdgEDy2XLqrJsO"
+			width="700px"
+			height="500px">
+		</iframe>
 		<div class="container">
+			
 		</div>
 	</body>
 </html>

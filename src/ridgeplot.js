@@ -5,7 +5,7 @@ import {axisLeft, axisBottom} from 'd3-axis';
 import {max, extent, bisectLeft} from 'd3-array';
 import {area, line, curveLinear} from 'd3-shape';
 import {format} from 'd3-format';
-import {brushX, brushSelection} from 'd3-brush';
+import {brushX} from 'd3-brush';
 import {dispatch} from 'd3-dispatch';
 
 export default function(){
@@ -152,7 +152,7 @@ export default function(){
                 .join('path')
                 .attr('class', 'crossridge')
                 .attr("fill", "none")
-                .attr("stroke", "#FF3D00")
+                .attr("stroke", "#FFA500")
                 .attr("d", d => crossridge(d));
         }
         // brush
@@ -163,7 +163,7 @@ export default function(){
             group.select('.brush').remove();
         }
 
-        brush.extent([[margin.left, -overlap * y.step()], [width, 0]]);
+        brush.extent([[margin.left, -overlap * y.step()], [width-margin.right, 0]]);
         
         group.select('.brush').call(brush);
 
@@ -237,6 +237,26 @@ export default function(){
         highlights = value;
         return chart;
     }
+    chart.margin = function(value) {
+        if (!arguments.length) return margin;
+        margin = value;
+        return chart;
+    };
+    chart.x = function(value) {
+        if (!arguments.length) return x;
+        x = value;
+        return chart;
+    };
+    chart.y = function(value) {
+        if (!arguments.length) return y;
+        y = value;
+        return chart;
+    };
+    chart.overlap = function(value) {
+        if (!arguments.length) return overlap;
+        overlap = value;
+        return chart;
+    };
     chart.brushEnabled = function(value){
         if (!arguments.length) return brushEnabled;
         brushEnabled = value;
@@ -269,7 +289,7 @@ export default function(){
                     return `translate(${selection[i]},${0})`
                 });
         }
-        listeners.apply("brushmove", this, [event, ...arguments]);
+        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, ...arguments]);
         // console.log('brushmove');
     }
     function brushend(row){
@@ -289,9 +309,7 @@ export default function(){
             //save brush state
             this.__brush_selection = selection.map(x.invert);
         }
-        listeners.apply("brushend", this, [event, ...arguments]);
-
-        
+        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, ...arguments]);        
     }
 
 
