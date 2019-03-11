@@ -20,6 +20,7 @@ export default function(){
             bottom: 30
         },
         data = null,
+        responsive = false,
         overlap = 0.9,
         step = 30,
         x = scaleLinear(),
@@ -73,10 +74,22 @@ export default function(){
         const visarea = svg.select('.visarea');
         const overlay = svg.select('.overlay');
         // update vis size
-        height = data.series.length * step
+        console.log(responsive);
+        if (responsive){
+            svg.attr('width', '100%')
+                .attr('height', '100%');
+            let rect = svg.node().getBoundingClientRect();
+            console.log(rect);
+            height = rect.height;
+            step = height/data.series.length;
+        }else{
+            height = data.series.length * step;
+            svg.attr('width', width)
+             .attr('height', height);
+        }
+        
 
-		svg.attr('width', width)
-            .attr('height', height);
+
             
         // visarea.attr('transform',
         //     'translate(' + margin.left + ',' + margin.top + ')');
@@ -225,6 +238,11 @@ export default function(){
     chart.height = function(value) {
         if (!arguments.length) return height;
         height = value;
+        return chart;
+    };
+    chart.responsive = function(value) {
+        if (!arguments.length) return responsive;
+        responsive = value;
         return chart;
     };
     chart.hoverEnabled = function(value){

@@ -11,7 +11,9 @@
 
 				let visdata = JSON.parse(localStorage.getItem('visdata'));
 				let plot = ridgeplot();
-				plot.on('brushmove',brushmove)
+				plot
+					.responsive(true)
+					.on('brushmove',brushmove)
 					.on('brushend', brushend);
 				let colorPicker = picker();
 				let colorTransferHandle = null;
@@ -265,10 +267,6 @@
 		</style> -->
 	</head>
 	<body>
-			<iframe src="https://drawit.mucollective.co/vis/GGsazOtC4EU6G3jnHRy0Ziu590g1/-L_VbRpdgEDy2XLqrJsO"
-			width="700px"
-			height="500px">
-		</iframe>
 		<div class="container">
 			
 		</div>
