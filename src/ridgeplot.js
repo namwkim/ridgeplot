@@ -39,7 +39,9 @@ export default function(){
         hoverEnabled = false,
         brushEnabled = true,
         onBrushMove = null,
-        onBrushEnd = null,
+		onBrushEnd = null,
+		xAxisLabelFormat = null,
+		yAxisLabelFormat = null,
         listeners = dispatch('brushmove', 'brushend'),
         brush = brushX()
             .on("brush", brushmove)
@@ -209,7 +211,7 @@ export default function(){
                 .attr('class', 'y axis');
         }
         yAxisGroup.attr("transform", `translate(${margin.left},0)`)
-            .call(axisLeft(y).tickSize(0).tickPadding(4))
+            .call(axisLeft(y).tickSize(0).tickPadding(4).tickFormat(yAxisLabelFormat))
             .call(g => g.select(".domain").remove())
 
         let xAxisGroup = visarea.select('.x.axis');
@@ -220,7 +222,8 @@ export default function(){
         xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
             .call(axisBottom(x)
             .ticks(width / 80)
-            .tickSizeOuter(0));
+			.tickSizeOuter(0)
+			.tickFormat(xAxisLabelFormat));
         
         overlay.attr("width", width)
             .attr("height", height)
@@ -279,12 +282,22 @@ export default function(){
         if (!arguments.length) return brushEnabled;
         brushEnabled = value;
         return chart;
-    }
+	}
+	chart.xAxisLabelFormat = function(value){
+		if (!arguments.length) return xAxisLabelFormat;
+        xAxisLabelFormat = value;
+        return chart;
+	}
+	chart.yAxisLabelFormat = function(value){
+		if (!arguments.length) return yAxisLabelFormat;
+        yAxisLabelFormat = value;
+        return chart;
+	}
     chart.on = function() {
         var value = listeners.on.apply(listeners, arguments);
         return value === listeners ? chart : value;
     };
-    
+
     function mousemove(){
         var x0 = x.invert(d3.mouse(this)[0]),
         i = bisectLeft(data.bins, x0, 1),

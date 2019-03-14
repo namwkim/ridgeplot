@@ -13,6 +13,7 @@
 				let plot = ridgeplot();
 				plot
 					.responsive(true)
+					.yAxisLabelFormat(d=>d.split('_')[0])
 					.on('brushmove',brushmove)
 					.on('brushend', brushend);
 				let colorPicker = picker();
@@ -55,8 +56,8 @@
                         data = _.sampleSize(data, data.length/100);
 						cells = _.sampleSize(data, 10);
 						cells = cells.map(cell=>Object.keys(cell).map(key=>{
-							let name = key.slice(0,key.length-6);
-							return {name, value:+cell[key]};
+							// let name = key.slice(0,key.length-6);
+							return {name:key, value:+cell[key]};
 						}));
 						console.time('kde_sampled');
 						let x = d3.scaleLinear().domain([0, 65535]).nice(40);
@@ -75,8 +76,8 @@
 							})),
 							bins:allDensity[0].density.map(d=>d[0])
 						};
-						visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
-						console.log('saving data...', visdata);
+						// visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
+						console.log('saving data...', visdata, cells);
 						window.localStorage.setItem('visdata', JSON.stringify(visdata));
 						window.localStorage.setItem('cells', JSON.stringify(cells));
 						visualize(visdata);

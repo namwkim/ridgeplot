@@ -36,6 +36,8 @@
         foci = null,
         hoverEnabled = false,
         brushEnabled = true,
+        xAxisLabelFormat = null,
+        yAxisLabelFormat = null,
         listeners = d3Dispatch.dispatch('brushmove', 'brushend'),
         brush = d3Brush.brushX().on("brush", brushmove).on("end", brushend),
         highlights = null,
@@ -63,10 +65,12 @@
       var visarea = svg.select('.visarea');
       var overlay = svg.select('.overlay'); // update vis size
 
+      console.log(responsive);
 
       if (responsive) {
         svg.attr('width', '100%').attr('height', '100%');
         var rect = svg.node().getBoundingClientRect();
+        console.log(rect);
         height = rect.height;
         step = height / data.series.length;
       } else {
@@ -158,7 +162,7 @@
         yAxisGroup = visarea.append('g').attr('class', 'y axis');
       }
 
-      yAxisGroup.attr("transform", "translate(".concat(margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4)).call(function (g) {
+      yAxisGroup.attr("transform", "translate(".concat(margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4).tickFormat(yAxisLabelFormat)).call(function (g) {
         return g.select(".domain").remove();
       });
       var xAxisGroup = visarea.select('.x.axis');
@@ -167,7 +171,7 @@
         xAxisGroup = visarea.append('g').attr('class', 'x axis');
       }
 
-      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0).tickFormat(xAxisLabelFormat));
       overlay.attr("width", width).attr("height", height).on("mouseover", function () {
         foci.style("display", null);
       }).on("mouseout", function () {
@@ -232,6 +236,18 @@
     chart.brushEnabled = function (value) {
       if (!arguments.length) return brushEnabled;
       brushEnabled = value;
+      return chart;
+    };
+
+    chart.xAxisLabelFormat = function (value) {
+      if (!arguments.length) return xAxisLabelFormat;
+      xAxisLabelFormat = value;
+      return chart;
+    };
+
+    chart.yAxisLabelFormat = function (value) {
+      if (!arguments.length) return yAxisLabelFormat;
+      yAxisLabelFormat = value;
       return chart;
     };
 
