@@ -21,6 +21,7 @@ export default function(){
         },
         data = null,
         responsive = false,
+        selectable = true,
         overlap = 0.9,
         step = 30,
         x = scaleLinear(),
@@ -40,12 +41,14 @@ export default function(){
         brushEnabled = true,
         onBrushMove = null,
         onBrushEnd = null,
-        listeners = dispatch('brushmove', 'brushend'),
+        listeners = dispatch('brushmove', 'brushend', 'selectrow'),
+        selections = [],
         brush = brushX()
             .on("brush", brushmove)
             .on("end", brushend),
         highlights = null,
-        handle = null;
+        handle = null,
+        group = null;
 
 
 
@@ -73,8 +76,8 @@ export default function(){
 		}
         const visarea = svg.select('.visarea');
         const overlay = svg.select('.overlay');
+
         // update vis size
-        console.log(responsive);
         if (responsive){
             svg.attr('width', '100%')
                 .attr('height', '100%');
@@ -89,13 +92,7 @@ export default function(){
         }
         
 
-
-            
-        // visarea.attr('transform',
-        //     'translate(' + margin.left + ',' + margin.top + ')');
-        // console.log(margin, width, height)
-        //save prev state if any
-        // scale
+        // scales
         x.domain(extent(data.bins))
             .range([margin.left, width - margin.right]);
         y.domain(data.series.map(d => d.name))
@@ -103,9 +100,28 @@ export default function(){
         z.domain([0, max(data.series, d => max(d.values))]).nice()
             .range([0, -overlap * y.step()]);
         
+        //axis
+        let yAxisGroup = visarea.select('.y.axis');
+        if (yAxisGroup.empty()) {
+            yAxisGroup = visarea.append('g')
+                .attr('class', 'y axis');
+        }
+        yAxisGroup.attr("transform", `translate(${selectable?margin.left-24:margin.left},0)`)
+            .call(axisLeft(y).tickSize(0).tickPadding(4))
+            .call(g => g.select(".domain").remove())
+
+        let xAxisGroup = visarea.select('.x.axis');
+        if (xAxisGroup.empty()) {
+            xAxisGroup = visarea.append('g')
+                .attr('class', 'x axis');
+        }
+        xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
+            .call(axisBottom(x)
+            .ticks(width / 80)
+            .tickSizeOuter(0));
         
         // console.log('x,y,z',x.domain(),y.domain(),z.domain());
-        const group = visarea.selectAll(".group")
+        group = visarea.selectAll(".group")
             .data(data.series)
             .join("g")
             .attr('class', 'group')
@@ -118,7 +134,6 @@ export default function(){
             .attr('class', 'area')
             .attr("fill", "#ddd")
             .attr("d", d=>{
-                // console.log(d.values);
                 return ridge(d.values)
             });
         
@@ -131,6 +146,24 @@ export default function(){
             .attr("stroke", "black")
             .attr("d", d => line(d.values));
         
+        if (selectable = true){
+            group.selectAll('.checkbox')
+                .data(d=>[d])
+                .join(
+                    enter=>enter.append("foreignObject")
+                        .attr('class', 'checkbox')
+                        .attr('x', margin.left-24)
+                        .attr('y', -10)
+                        .attr('width', 24)
+                        .attr('height', 24)
+                        .append("xhtml:input")
+                        .attr("type", "checkbox")
+                        .attr("name", d=>d.name)
+                        .on('change', selectrow)
+                );
+                
+
+        }
         if (group.select('.focus').empty() && hoverEnabled){
             foci = group.append('g')
             .attr("class", "focus")
@@ -165,6 +198,7 @@ export default function(){
                 .join('path')
                 .attr('class', 'crossridge')
                 .attr("fill", "none")
+                .attr('stroke-opacity', 0.5)
                 .attr("stroke", "#FFA500")
                 .attr("d", d => crossridge(d));
         }
@@ -176,57 +210,53 @@ export default function(){
             group.select('.brush').remove();
         }
 
-        brush.extent([[margin.left, -overlap * y.step()], [width-margin.right, 0]]);
+        brush.extent([[margin.left, -overlap * y.step()/4], [width-margin.right, overlap * y.step()/4]]);
         
         group.select('.brush').call(brush);
+
+        //brush customize
 
         handle = group.select('.brush')
             .selectAll(".handle--custom")
             .data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
-            .join('line')
+            .join('path')
             .attr("class", "handle--custom")
             .attr('display', 'none')
             .attr("cursor", "ew-resize")
+            .attr('fill', '#eee')
             .attr('stroke', '#757575')
-            .attr('y0', 1)
-            .attr('y1', -overlap*y.step()+1);
-            // .attr("d", function(d) {
-            //     var e = +(d.type == "e"),
-            //         dx = e ? 1 : -1,
-            //         dy = overlap*y.step();
-            //     return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
-            // });
-  
+            // .attr('y0', 1)
+            // .attr('y1', -overlap*y.step()+1); 
+            .attr("d", function(d) {
+                var e = +(d.type == "e"),
+                    dx = e ? 3 : -3,
+                    dy = overlap*y.step()/4;
+                return "M" + (dx) + "," + (-dy) +  "V" + ( dy) + "H" + (-dx) + "V"+  (- dy)+ "Z" + "M" + (0) + "," + (-dy + dy/2) + "V" + (dy - dy/2);
+            });
+        
+        // disable overlay brush
+        group.select('.brush').select('.overlay')
+            .style('cursor', 'auto')
+            .on('mousedown', null);
+        // disable brush area
+        group.select('.brush .selection')
+            .attr('fill-opacity',0)
+            .style('cursor', 'auto')
+            .attr('fill', null)
+            .attr('stroke', null);
         group.select('.brush').each(function(d){
             if (this.__brush_selection){
                 brush.move(select(this),this.__brush_selection.map(x));
+            }else{
+                brush.move(select(this),extent(data.bins).map(x));
             }
         });
-        //axis
-        let yAxisGroup = visarea.select('.y.axis');
-		if (yAxisGroup.empty()) {
-            yAxisGroup = visarea.append('g')
-                .attr('class', 'y axis');
-        }
-        yAxisGroup.attr("transform", `translate(${margin.left},0)`)
-            .call(axisLeft(y).tickSize(0).tickPadding(4))
-            .call(g => g.select(".domain").remove())
-
-        let xAxisGroup = visarea.select('.x.axis');
-        if (xAxisGroup.empty()) {
-            xAxisGroup = visarea.append('g')
-                .attr('class', 'x axis');
-        }
-        xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
-            .call(axisBottom(x)
-            .ticks(width / 80)
-            .tickSizeOuter(0));
-        
+     
         overlay.attr("width", width)
             .attr("height", height)
             .on("mouseover", ()=>{ foci.style("display", null); })
             .on("mouseout", ()=>{ foci.style("display", "none"); })
-            .on("mousemove", mousemove);
+            .on("mousemove", focusmove);
 
     }
     chart.width = function(value) {
@@ -284,8 +314,10 @@ export default function(){
         var value = listeners.on.apply(listeners, arguments);
         return value === listeners ? chart : value;
     };
-    
-    function mousemove(){
+    function selectrow(d){
+        listeners.apply("selectrow", this, [d.name, this.checked]);
+    }
+    function focusmove(){
         var x0 = x.invert(d3.mouse(this)[0]),
         i = bisectLeft(data.bins, x0, 1),
         d0 = data.bins[i - 1],
@@ -299,12 +331,21 @@ export default function(){
     }
     function brushmove(row){
         let selection = event.selection;
+        group.select('.brush').select('.overlay').attr('cursor', 'ew-resize');
         if (selection==null){
             handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
         }else{
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', (d,i)=>{
                     return `translate(${selection[i]},${0})`
+                });
+            let dataSelection = selection.map(x.invert);
+            group.filter(d=>d.name==row.name).selectAll('.area')
+                .attr("d", d=>{
+                    let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
+                    let eidx = data.bins.length - data.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
+                    ridge.defined((d,i)=>i>=sidx && i<eidx);
+                    return ridge(d.values);
                 });
         }
         listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, ...arguments]);
@@ -313,10 +354,10 @@ export default function(){
     function brushend(row){
         
         let selection = event.selection;
-        // console.log('brushend', row, selection);
         if (selection==null){
             // console.log('nulllllll')
-            handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
+            // handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
+            brush.move(select(this),extent(data.bins).map(x));
         }else{
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', function(d,i){
@@ -325,7 +366,16 @@ export default function(){
                     return `translate(${selection[i]},${0})`
                 });
             //save brush state
-            this.__brush_selection = selection.map(x.invert);
+            let dataSelection = selection.map(x.invert);
+            this.__brush_selection = dataSelection;
+
+            group.filter(d=>d.name==row.name).selectAll('.area')
+                .attr("d", d=>{
+                    let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
+                    let eidx = data.bins.length - data.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
+                    ridge.defined((d,i)=>i>=sidx && i<eidx);
+                    return ridge(d.values);
+                });
         }
         listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, ...arguments]);        
     }

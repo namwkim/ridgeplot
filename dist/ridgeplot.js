@@ -16,6 +16,7 @@
     },
         data = null,
         responsive = false,
+        selectable = true,
         overlap = 0.9,
         step = 30,
         x = d3Scale.scaleLinear(),
@@ -36,10 +37,11 @@
         foci = null,
         hoverEnabled = false,
         brushEnabled = true,
-        listeners = d3Dispatch.dispatch('brushmove', 'brushend'),
+        listeners = d3Dispatch.dispatch('brushmove', 'brushend', 'selectrow'),
         brush = d3Brush.brushX().on("brush", brushmove).on("end", brushend),
         highlights = null,
-        handle = null;
+        handle = null,
+        group = null;
 
     function chart(selection) {
       // draw chart
@@ -63,20 +65,16 @@
       var visarea = svg.select('.visarea');
       var overlay = svg.select('.overlay'); // update vis size
 
-
       if (responsive) {
         svg.attr('width', '100%').attr('height', '100%');
         var rect = svg.node().getBoundingClientRect();
+        console.log(rect);
         height = rect.height;
         step = height / data.series.length;
       } else {
         height = data.series.length * step;
         svg.attr('width', width).attr('height', height);
-      } // visarea.attr('transform',
-      //     'translate(' + margin.left + ',' + margin.top + ')');
-      // console.log(margin, width, height)
-      //save prev state if any
-      // scale
+      } // scales
 
 
       x.domain(d3Array.extent(data.bins)).range([margin.left, width - margin.right]);
@@ -85,16 +83,32 @@
       })).range([margin.top, height - margin.bottom]);
       z.domain([0, d3Array.max(data.series, function (d) {
         return d3Array.max(d.values);
-      })]).nice().range([0, -overlap * y.step()]); // console.log('x,y,z',x.domain(),y.domain(),z.domain());
+      })]).nice().range([0, -overlap * y.step()]); //axis
 
-      var group = visarea.selectAll(".group").data(data.series).join("g").attr('class', 'group').attr("transform", function (d) {
+      var yAxisGroup = visarea.select('.y.axis');
+
+      if (yAxisGroup.empty()) {
+        yAxisGroup = visarea.append('g').attr('class', 'y axis');
+      }
+
+      yAxisGroup.attr("transform", "translate(".concat(selectable ? margin.left - 24 : margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4)).call(function (g) {
+        return g.select(".domain").remove();
+      });
+      var xAxisGroup = visarea.select('.x.axis');
+
+      if (xAxisGroup.empty()) {
+        xAxisGroup = visarea.append('g').attr('class', 'x axis');
+      }
+
+      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0)); // console.log('x,y,z',x.domain(),y.domain(),z.domain());
+
+      group = visarea.selectAll(".group").data(data.series).join("g").attr('class', 'group').attr("transform", function (d) {
         return "translate(0,".concat(y(d.name) + 1, ")");
       }); // .attr("transform", (d, i) => `translate(0,${i * (step + 1) + margin.top})`);
 
       group.selectAll('.area').data(function (d) {
         return [d];
       }).join("path").attr('class', 'area').attr("fill", "#ddd").attr("d", function (d) {
-        // console.log(d.values);
         return ridge(d.values);
       });
       var line = ridge.lineY1();
@@ -103,6 +117,16 @@
       }).join("path").attr('class', 'line').attr("fill", "none").attr("stroke", "black").attr("d", function (d) {
         return line(d.values);
       });
+
+      if (selectable = true) {
+        group.selectAll('.checkbox').data(function (d) {
+          return [d];
+        }).join(function (enter) {
+          return enter.append("foreignObject").attr('class', 'checkbox').attr('x', margin.left - 24).attr('y', -10).attr('width', 24).attr('height', 24).append("xhtml:input").attr("type", "checkbox").attr("name", function (d) {
+            return d.name;
+          }).on('change', selectrow);
+        });
+      }
 
       if (group.select('.focus').empty() && hoverEnabled) {
         foci = group.append('g').attr("class", "focus").style("display", "none"); // console.log(foci);
@@ -117,7 +141,7 @@
 
 
       if (highlights) {
-        visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr("stroke", "#FFA500").attr("d", function (d) {
+        visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr('stroke-opacity', 0.5).attr("stroke", "#FFA500").attr("d", function (d) {
           return crossridge(d);
         });
       } // brush
@@ -129,8 +153,9 @@
         group.select('.brush').remove();
       }
 
-      brush.extent([[margin.left, -overlap * y.step()], [width - margin.right, 0]]);
-      group.select('.brush').call(brush);
+      brush.extent([[margin.left, -overlap * y.step() / 4], [width - margin.right, overlap * y.step() / 4]]);
+      group.select('.brush').call(brush); //brush customize
+
       handle = group.select('.brush').selectAll(".handle--custom").data(function (d) {
         return [{
           parent: d,
@@ -139,40 +164,30 @@
           parent: d,
           type: "e"
         }];
-      }).join('line').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize").attr('stroke', '#757575').attr('y0', 1).attr('y1', -overlap * y.step() + 1); // .attr("d", function(d) {
-      //     var e = +(d.type == "e"),
-      //         dx = e ? 1 : -1,
-      //         dy = overlap*y.step();
-      //     return "M" + (.5 * dx) + "," + dy + "A6,6 0 0 " + e + " " + (6.5 * dx) + "," + (dy + 6) + "V" + (2 * dy - 6) + "A6,6 0 0 " + e + " " + (.5 * dx) + "," + (2 * dy) + "Z" + "M" + (2.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8) + "M" + (4.5 * dx) + "," + (dy + 8) + "V" + (2 * dy - 8);
-      // });
+      }).join('path').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize").attr('fill', '#eee').attr('stroke', '#757575') // .attr('y0', 1)
+      // .attr('y1', -overlap*y.step()+1); 
+      .attr("d", function (d) {
+        var e = +(d.type == "e"),
+            dx = e ? 3 : -3,
+            dy = overlap * y.step() / 4;
+        return "M" + dx + "," + -dy + "V" + dy + "H" + -dx + "V" + -dy + "Z" + "M" + 0 + "," + (-dy + dy / 2) + "V" + (dy - dy / 2);
+      }); // disable overlay brush
 
+      group.select('.brush').select('.overlay').style('cursor', 'auto').on('mousedown', null); // disable brush area
+
+      group.select('.brush .selection').attr('fill-opacity', 0).style('cursor', 'auto').attr('fill', null).attr('stroke', null);
       group.select('.brush').each(function (d) {
         if (this.__brush_selection) {
           brush.move(d3Selection.select(this), this.__brush_selection.map(x));
+        } else {
+          brush.move(d3Selection.select(this), d3Array.extent(data.bins).map(x));
         }
-      }); //axis
-
-      var yAxisGroup = visarea.select('.y.axis');
-
-      if (yAxisGroup.empty()) {
-        yAxisGroup = visarea.append('g').attr('class', 'y axis');
-      }
-
-      yAxisGroup.attr("transform", "translate(".concat(margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4)).call(function (g) {
-        return g.select(".domain").remove();
       });
-      var xAxisGroup = visarea.select('.x.axis');
-
-      if (xAxisGroup.empty()) {
-        xAxisGroup = visarea.append('g').attr('class', 'x axis');
-      }
-
-      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
       overlay.attr("width", width).attr("height", height).on("mouseover", function () {
         foci.style("display", null);
       }).on("mouseout", function () {
         foci.style("display", "none");
-      }).on("mousemove", mousemove);
+      }).on("mousemove", focusmove);
     }
 
     chart.width = function (value) {
@@ -240,7 +255,11 @@
       return value === listeners ? chart : value;
     };
 
-    function mousemove() {
+    function selectrow(d) {
+      listeners.apply("selectrow", this, [d.name, this.checked]);
+    }
+
+    function focusmove() {
       var x0 = x.invert(d3.mouse(this)[0]),
           i = d3Array.bisectLeft(data.bins, x0, 1),
           d0 = data.bins[i - 1],
@@ -257,6 +276,7 @@
 
     function brushmove(row) {
       var selection = d3Selection.event.selection;
+      group.select('.brush').select('.overlay').attr('cursor', 'ew-resize');
 
       if (selection == null) {
         handle.filter(function (d) {
@@ -268,19 +288,33 @@
         }).attr('display', null).attr('transform', function (d, i) {
           return "translate(".concat(selection[i], ",", 0, ")");
         });
+        var dataSelection = selection.map(x.invert);
+        group.filter(function (d) {
+          return d.name == row.name;
+        }).selectAll('.area').attr("d", function (d) {
+          var sidx = data.bins.findIndex(function (value) {
+            return value >= dataSelection[0];
+          });
+          var eidx = data.bins.length - data.bins.slice().reverse().findIndex(function (value) {
+            return value <= dataSelection[1];
+          });
+          ridge.defined(function (d, i) {
+            return i >= sidx && i < eidx;
+          });
+          return ridge(d.values);
+        });
       }
 
       listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection].concat(Array.prototype.slice.call(arguments))); // console.log('brushmove');
     }
 
     function brushend(row) {
-      var selection = d3Selection.event.selection; // console.log('brushend', row, selection);
+      var selection = d3Selection.event.selection;
 
       if (selection == null) {
         // console.log('nulllllll')
-        handle.filter(function (d) {
-          return d.parent.name == row.name;
-        }).attr('display', 'none');
+        // handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
+        brush.move(d3Selection.select(this), d3Array.extent(data.bins).map(x));
       } else {
         handle.filter(function (d) {
           return d.parent.name == row.name;
@@ -290,7 +324,22 @@
           return "translate(".concat(selection[i], ",", 0, ")");
         }); //save brush state
 
-        this.__brush_selection = selection.map(x.invert);
+        var dataSelection = selection.map(x.invert);
+        this.__brush_selection = dataSelection;
+        group.filter(function (d) {
+          return d.name == row.name;
+        }).selectAll('.area').attr("d", function (d) {
+          var sidx = data.bins.findIndex(function (value) {
+            return value >= dataSelection[0];
+          });
+          var eidx = data.bins.length - data.bins.slice().reverse().findIndex(function (value) {
+            return value <= dataSelection[1];
+          });
+          ridge.defined(function (d, i) {
+            return i >= sidx && i < eidx;
+          });
+          return ridge(d.values);
+        });
       }
 
       listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection].concat(Array.prototype.slice.call(arguments)));
