@@ -7,13 +7,15 @@
 			<script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
 
 			<script type="module">
-				import picker from './huepicker.js';
-
+				import picker from './rainbow.js';
+				let selections = [],
+					ranges = {};
 				let visdata = JSON.parse(localStorage.getItem('visdata'));
 				let plot = ridgeplot();
 				plot
 					.responsive(true)
 					.yAxisLabelFormat(d=>d.split('_')[0])
+					.on('selectrow',selectrow)
 					.on('brushmove',brushmove)
 					.on('brushend', brushend);
 				let colorPicker = picker();
@@ -103,35 +105,63 @@
 						.highlights(cells);
 					container.datum(visdata)
 						.call(plot);
+
+					console.log(plot.overlap(),'overlap')
 					// add group
 					d3.selectAll('.group')
-						.selectAll(".color-transfer")
+            			.selectAll(".color-transfer")
 						.data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
-						.join('rect')
-						.attr("class", "color-transfer")
-						.attr('display', 'none')
-						.attr("cursor", "pointer")
-						.attr('stroke', 'white')
-						.attr('fill', 'black')
-						.attr('width', 10)
-						.attr('height', 10)
-						.attr('rx', 2)
-						.attr('ry', 2)
-						.attr('x',d=>d.type=='w'?-15:5)
-						.attr('y', -plot.overlap()*plot.y().step()/2-5)
-						.on('mouseup', onShowColorPicker);
+						.join(
+							enter=>enter.append('rect')
+							.attr("class", "color-transfer")
+							.attr('display', 'none')
+							.attr("cursor", "pointer")
+							.attr('stroke', 'white')
+							.attr('fill', 'black')
+							.attr('width', 10)
+							.attr('height', 10)
+							.attr('rx', 2)
+							.attr('ry', 2)
+							.attr('x',-5)//d=>d.type=='w'?-15:5)
+							.attr('y', plot.y().step()/4+2)
+							.on('pointerup', onShowColorPicker),
+							update=>update.attr('y', plot.y().step()/4+2)
+								
+
+						);
+						
+					
+					
 				}
+			function selectrow(name, status){
+				if (status && selections.length==3){
+					this.checked = false;
+					return;
+				};
+				if (status){
+					selections.push(name);
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==name)
+						.attr('display', null)
+						.attr('transform', function(d,i){
+							return `translate(${ranges[name].pixelRange[i]},${0})`});
+				}else{
+					selections = selections.filter(d=>d!=name);
+					d3.selectAll('.color-transfer')
+						.filter(d=>d.parent.name==name).attr('display', 'none');
+				}
+				console.log(selections);
+			}
 			function brushmove(range, pixelRange, row){
+				console.log(pixelRange);
 				if (pixelRange){
 					d3.selectAll('.color-transfer')
-						.filter(d=>d.parent.name==row.name).attr('display', null)
+						.filter(d=>d.parent.name==row.name)
 						.attr('transform', function(d,i){
-							// console.log(this);
-							// console.log(d);
 							return `translate(${pixelRange[i]},${0})`});
 				}else{//remove
-					d3.selectAll('.color-transfer')
-						.filter(d=>d.parent.name==row.name).attr('display', 'none')
+					// d3.selectAll('.color-transfer')
+					// 	.filter(d=>d.parent.name==row.name).attr('display', 'none')
 				}
 				
 				// d3.select('.picker-container')
@@ -139,20 +169,18 @@
 				// 	.style('top', d3.event.sourceEvent.clientY+'px');
 
 			}
-			function brushend(range, pixelRange, row){
-				console.log('brush-end', pixelRange);
+			function brushend(dataRange, pixelRange, row){
+				console.log('brush-end', pixelRange, row);
 				if (pixelRange){
 					d3.selectAll('.color-transfer')
-						.filter(d=>d.parent.name==row.name).attr('display', null)
+						.filter(d=>d.parent.name==row.name)
 						.attr('transform', function(d,i){
-							// console.log(this);
-							// console.log(d);
 							return `translate(${pixelRange[i]},${0})`});
 				}else{//remove
-					d3.selectAll('.color-transfer')
-						.filter(d=>d.parent.name==row.name).attr('display', 'none')
+					// d3.selectAll('.color-transfer')
+					// 	.filter(d=>d.parent.name==row.name).attr('display', 'none')
 				}
-				
+				ranges[row.name] = {pixelRange, dataRange};
 				// d3.select('.picker-container')
 				// 	.style('left', d3.event.sourceEvent.clientX+'px')
 				// 	.style('top', d3.event.sourceEvent.clientY+'px');
@@ -167,6 +195,7 @@
 			function onShowColorPicker(){
 				colorTransferHandle = d3.select(this);
 				let color = colorTransferHandle.style('fill');
+				console.log(color, d3.hsl(color));
 				let hsl = d3.hsl(color);
 				colorPicker.set(hsl)
 				colorPicker.show(d3.event.clientX, d3.event.clientY);
