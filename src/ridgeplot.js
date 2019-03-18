@@ -41,16 +41,19 @@ export default function(){
         brushEnabled = true,
         onBrushMove = null,
 		onBrushEnd = null,
-		xAxisLabelFormat = null,
+		xAxisLabelFormat = format(',.0f'),
 		yAxisLabelFormat = null,
         listeners = dispatch('brushmove', 'brushend', 'selectrow'),
-        selections = [],
+        ranges = {},
         brush = brushX()
             .on("brush", brushmove)
             .on("end", brushend),
         highlights = null,
+        exponent = 0.025,
+        // highlightScale = scalePow().exponent(-0.5). range([1]),
         handle = null,
-        group = null;
+        group = null,
+        highlightGroup = null;;
 
 
 
@@ -72,9 +75,6 @@ export default function(){
             svg.append("rect")
                 .attr("class", "overlay")
                 .attr('fill', 'none');
-
-            svg.append('g')
-                
 		}
         const visarea = svg.select('.visarea');
         const overlay = svg.select('.overlay');
@@ -107,7 +107,7 @@ export default function(){
                 .attr('class', 'y axis');
         }
         yAxisGroup.attr("transform", `translate(${selectable?margin.left-24:margin.left},0)`)
-            .call(axisLeft(y).tickSize(0).tickPadding(4))
+            .call(axisLeft(y).tickSize(0).tickPadding(4).tickFormat(yAxisLabelFormat))
             .call(g => g.select(".domain").remove())
 
         let xAxisGroup = visarea.select('.x.axis');
@@ -118,7 +118,8 @@ export default function(){
         xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
             .call(axisBottom(x)
             .ticks(width / 80)
-            .tickSizeOuter(0));
+            .tickSizeOuter(0)
+            .tickFormat(xAxisLabelFormat));
         
         // console.log('x,y,z',x.domain(),y.domain(),z.domain());
         group = visarea.selectAll(".group")
@@ -134,7 +135,7 @@ export default function(){
             .attr('class', 'area')
             .attr("fill", "#ddd")
             .attr("d", d=>{
-                return ridge(d.values)
+                return ridge(d.values);
             });
         
         let line = ridge.lineY1();
@@ -156,7 +157,8 @@ export default function(){
                         .attr('y', -10)
                         .attr('width', 24)
                         .attr('height', 24)
-                        .append("xhtml:input")
+                        .style('line-height', 1)
+                        .append("xhtml:input")                        
                         .attr("type", "checkbox")
                         .attr("name", d=>d.name)
                         .on('change', selectrow)
@@ -190,16 +192,18 @@ export default function(){
         }
   
         // visualize highlights
-        if (highlights){
-            visarea.selectAll('.crossridge')
+        if (highlights && highlights.length>0){
+            console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+            highlightGroup = visarea.selectAll('.crossridge')
                 .data(highlights)
                 .join('path')
                 .attr('class', 'crossridge')
                 .attr("fill", "none")
-                .attr('stroke-opacity', 0.5)
+                .attr('stroke-opacity', d=>highlightVisible(d)? Math.pow(highlights.length, -exponent):0.0)//highlightScale.domain([1, highlights.length])(highlights.length))
                 .attr("stroke", "#FFA500")
                 .attr("d", d => crossridge(d));
         }
+
         // brush
         if (brushEnabled && group.select('.brush').empty()){
             group.append('g')
@@ -213,15 +217,29 @@ export default function(){
         group.select('.brush').call(brush);
 
         //brush customize
-
         handle = group.select('.brush')
             .selectAll(".handle--custom")
             .data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
-            .join('path')
+            .join('g')
             .attr("class", "handle--custom")
             .attr('display', 'none')
-            .attr("cursor", "ew-resize")
-            .attr('fill', '#eee')
+            .attr("cursor", "ew-resize");
+
+        handle.selectAll('.label')
+            .data(d=>[d])
+            .join('text')
+            .attr('class', 'label')
+            .attr('fill', '#757575')
+            .attr('font-size', '9px')
+            .attr('font-family', 'arial')
+            .attr('alignment-baseline', 'baseline')
+            .attr('text-anchor', 'middle')
+            .attr('dy', -(y.step()/4+1)+'px');
+        
+        handle.selectAll('.knob')
+            .data(d=>[d])
+            .join('path')
+            .attr('class', 'knob')
             .attr('stroke', '#757575')
             // .attr('y0', 1)
             // .attr('y1', -overlap*y.step()+1); 
@@ -243,9 +261,10 @@ export default function(){
             .attr('fill', null)
             .attr('stroke', null);
         group.select('.brush').each(function(d){
+            this.__brush_initializing = true;
             if (this.__brush_selection){
                 brush.move(select(this),this.__brush_selection.map(x));
-            }else{
+            }else{                
                 brush.move(select(this),extent(data.bins).map(x));
             }
         });
@@ -304,6 +323,11 @@ export default function(){
         overlap = value;
         return chart;
     };
+    chart.exponent = function(value) {
+        if (!arguments.length) return exponent;
+        exponent = value;
+        return chart;
+    };
     chart.brushEnabled = function(value){
         if (!arguments.length) return brushEnabled;
         brushEnabled = value;
@@ -344,11 +368,14 @@ export default function(){
         if (selection==null){
             handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
         }else{
+            let dataSelection = selection.map(x.invert);
+            ranges[row.name] = dataSelection;
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', (d,i)=>{
                     return `translate(${selection[i]},${0})`
-                });
-            let dataSelection = selection.map(x.invert);
+                }).select('.label')
+                .text((d,i)=>xAxisLabelFormat(dataSelection[i]));
+            
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
                     let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
@@ -356,27 +383,32 @@ export default function(){
                     ridge.defined((d,i)=>i>=sidx && i<eidx);
                     return ridge(d.values);
                 });
+            if (highlights && highlights.length>0){
+                // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+                highlightGroup
+                    .attr('stroke-opacity',d=>highlightVisible(d)? Math.pow(highlights.length, -exponent):0.0);
+            }
         }
-        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, ...arguments]);
+        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
         // console.log('brushmove');
     }
     function brushend(row){
         
         let selection = event.selection;
         if (selection==null){
-            // console.log('nulllllll')
-            // handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
             brush.move(select(this),extent(data.bins).map(x));
         }else{
-            handle.filter(d=>d.parent.name==row.name).attr('display', null)
-                .attr('transform', function(d,i){
-                    // console.log(this);
-                    // console.log(d);
-                    return `translate(${selection[i]},${0})`
-                });
             //save brush state
             let dataSelection = selection.map(x.invert);
             this.__brush_selection = dataSelection;
+            ranges[row.name] = dataSelection;
+
+            handle.filter(d=>d.parent.name==row.name).attr('display', null)
+                .attr('transform', function(d,i){
+                    return `translate(${selection[i]},${0})`
+                }).select('.label')
+                .text((d,i)=>xAxisLabelFormat(dataSelection[i]));
+
 
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
@@ -386,7 +418,16 @@ export default function(){
                     return ridge(d.values);
                 });
         }
-        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, ...arguments]);        
+        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
+        this.__brush_initializing = false;
+        
+    }
+    function highlightVisible(ds){
+        if (Object.values(ranges).length>0){
+            return !ds.some(d=>ranges[d.name]? (d.value<ranges[d.name][0]|| d.value > ranges[d.name][1]):true);
+        }else{
+            return true;
+        }
     }
 
 

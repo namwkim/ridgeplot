@@ -15,6 +15,7 @@
 				plot
 					.responsive(true)
 					.yAxisLabelFormat(d=>d.split('_')[0])
+					// .xAxisLabelFormat(d=>parseInt(d))
 					.on('selectrow',selectrow)
 					.on('brushmove',brushmove)
 					.on('brushend', brushend);
@@ -27,7 +28,7 @@
 				d3.select(document.body).call(colorPicker);//add it to body
 				let cells = JSON.parse(localStorage.getItem('cells'));
 				if (visdata){
-					cells = _.sampleSize(cells, 5);
+					// cells = _.sampleSize(cells, 5);
 					// cells.forEach(cell=>cell.forEach(d=>d.value=+d.value));
 					console.log('used cached data...', visdata, cells);
 					visualize(visdata);
@@ -63,7 +64,7 @@
 						}));
 						console.time('kde_sampled');
 						let x = d3.scaleLinear().domain([0, 65535]).nice(40);
-						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40));
+						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(120));
 						
 						let allDensity = columns.map(key=>{
                             let values = data.map(function(d){  return +d[key]; });
@@ -123,7 +124,7 @@
 							.attr('rx', 2)
 							.attr('ry', 2)
 							.attr('x',-5)//d=>d.type=='w'?-15:5)
-							.attr('y', plot.y().step()/4+2)
+							.attr('y', plot.y().step()/4)
 							.on('pointerup', onShowColorPicker),
 							update=>update.attr('y', plot.y().step()/4+2)
 								
@@ -167,7 +168,6 @@
 				// d3.select('.picker-container')
 				// 	.style('left', d3.event.sourceEvent.clientX+'px')
 				// 	.style('top', d3.event.sourceEvent.clientY+'px');
-
 			}
 			function brushend(dataRange, pixelRange, row){
 				console.log('brush-end', pixelRange, row);

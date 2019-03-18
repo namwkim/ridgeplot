@@ -37,13 +37,17 @@
         foci = null,
         hoverEnabled = false,
         brushEnabled = true,
-        xAxisLabelFormat = null,
+        xAxisLabelFormat = d3Format.format(',.0f'),
         yAxisLabelFormat = null,
         listeners = d3Dispatch.dispatch('brushmove', 'brushend', 'selectrow'),
+        ranges = {},
         brush = d3Brush.brushX().on("brush", brushmove).on("end", brushend),
         highlights = null,
-        handle = null,
-        group = null;
+        exponent = 0.025,
+        // highlightScale = scalePow().exponent(-0.5). range([1]),
+    handle = null,
+        group = null,
+        highlightGroup = null;
 
     function chart(selection) {
       // draw chart
@@ -61,7 +65,6 @@
         svg = selection.append('svg');
         svg.append('g').attr('class', 'visarea');
         svg.append("rect").attr("class", "overlay").attr('fill', 'none');
-        svg.append('g');
       }
 
       var visarea = svg.select('.visarea');
@@ -70,7 +73,6 @@
       if (responsive) {
         svg.attr('width', '100%').attr('height', '100%');
         var rect = svg.node().getBoundingClientRect();
-        console.log(rect);
         height = rect.height;
         step = height / data.series.length;
       } else {
@@ -93,7 +95,7 @@
         yAxisGroup = visarea.append('g').attr('class', 'y axis');
       }
 
-      yAxisGroup.attr("transform", "translate(".concat(selectable ? margin.left - 24 : margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4)).call(function (g) {
+      yAxisGroup.attr("transform", "translate(".concat(selectable ? margin.left - 24 : margin.left, ",0)")).call(d3Axis.axisLeft(y).tickSize(0).tickPadding(4).tickFormat(yAxisLabelFormat)).call(function (g) {
         return g.select(".domain").remove();
       });
       var xAxisGroup = visarea.select('.x.axis');
@@ -102,7 +104,7 @@
         xAxisGroup = visarea.append('g').attr('class', 'x axis');
       }
 
-      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0)); // console.log('x,y,z',x.domain(),y.domain(),z.domain());
+      xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0).tickFormat(xAxisLabelFormat)); // console.log('x,y,z',x.domain(),y.domain(),z.domain());
 
       group = visarea.selectAll(".group").data(data.series).join("g").attr('class', 'group').attr("transform", function (d) {
         return "translate(0,".concat(y(d.name) + 1, ")");
@@ -124,7 +126,7 @@
         group.selectAll('.checkbox').data(function (d) {
           return [d];
         }).join(function (enter) {
-          return enter.append("foreignObject").attr('class', 'checkbox').attr('x', margin.left - 24).attr('y', -10).attr('width', 24).attr('height', 24).append("xhtml:input").attr("type", "checkbox").attr("name", function (d) {
+          return enter.append("foreignObject").attr('class', 'checkbox').attr('x', margin.left - 24).attr('y', -10).attr('width', 24).attr('height', 24).style('line-height', 1).append("xhtml:input").attr("type", "checkbox").attr("name", function (d) {
             return d.name;
           }).on('change', selectrow);
         });
@@ -142,8 +144,12 @@
       } // visualize highlights
 
 
-      if (highlights) {
-        visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr('stroke-opacity', 0.5).attr("stroke", "#FFA500").attr("d", function (d) {
+      if (highlights && highlights.length > 0) {
+        console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+        highlightGroup = visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr('stroke-opacity', function (d) {
+          return highlightVisible(d) ? Math.pow(highlights.length, -exponent) : 0.0;
+        }) //highlightScale.domain([1, highlights.length])(highlights.length))
+        .attr("stroke", "#FFA500").attr("d", function (d) {
           return crossridge(d);
         });
       } // brush
@@ -166,7 +172,13 @@
           parent: d,
           type: "e"
         }];
-      }).join('path').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize").attr('fill', '#eee').attr('stroke', '#757575') // .attr('y0', 1)
+      }).join('g').attr("class", "handle--custom").attr('display', 'none').attr("cursor", "ew-resize");
+      handle.selectAll('.label').data(function (d) {
+        return [d];
+      }).join('text').attr('class', 'label').attr('fill', '#757575').attr('font-size', '9px').attr('font-family', 'arial').attr('alignment-baseline', 'baseline').attr('text-anchor', 'middle').attr('dy', -(y.step() / 4 + 1) + 'px');
+      handle.selectAll('.knob').data(function (d) {
+        return [d];
+      }).join('path').attr('class', 'knob').attr('stroke', '#757575') // .attr('y0', 1)
       // .attr('y1', -overlap*y.step()+1); 
       .attr("d", function (d) {
         var e = +(d.type == "e"),
@@ -179,6 +191,8 @@
 
       group.select('.brush .selection').attr('fill-opacity', 0).style('cursor', 'auto').attr('fill', null).attr('stroke', null);
       group.select('.brush').each(function (d) {
+        this.__brush_initializing = true;
+
         if (this.__brush_selection) {
           brush.move(d3Selection.select(this), this.__brush_selection.map(x));
         } else {
@@ -246,6 +260,12 @@
       return chart;
     };
 
+    chart.exponent = function (value) {
+      if (!arguments.length) return exponent;
+      exponent = value;
+      return chart;
+    };
+
     chart.brushEnabled = function (value) {
       if (!arguments.length) return brushEnabled;
       brushEnabled = value;
@@ -297,12 +317,15 @@
           return d.parent.name == row.name;
         }).attr('display', 'none');
       } else {
+        var dataSelection = selection.map(x.invert);
+        ranges[row.name] = dataSelection;
         handle.filter(function (d) {
           return d.parent.name == row.name;
         }).attr('display', null).attr('transform', function (d, i) {
           return "translate(".concat(selection[i], ",", 0, ")");
+        }).select('.label').text(function (d, i) {
+          return xAxisLabelFormat(dataSelection[i]);
         });
-        var dataSelection = selection.map(x.invert);
         group.filter(function (d) {
           return d.name == row.name;
         }).selectAll('.area').attr("d", function (d) {
@@ -317,29 +340,35 @@
           });
           return ridge(d.values);
         });
+
+        if (highlights && highlights.length > 0) {
+          // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+          highlightGroup.attr('stroke-opacity', function (d) {
+            return highlightVisible(d) ? Math.pow(highlights.length, -exponent) : 0.0;
+          });
+        }
       }
 
-      listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection].concat(Array.prototype.slice.call(arguments))); // console.log('brushmove');
+      listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing]); // console.log('brushmove');
     }
 
     function brushend(row) {
       var selection = d3Selection.event.selection;
 
       if (selection == null) {
-        // console.log('nulllllll')
-        // handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
         brush.move(d3Selection.select(this), d3Array.extent(data.bins).map(x));
       } else {
+        //save brush state
+        var dataSelection = selection.map(x.invert);
+        this.__brush_selection = dataSelection;
+        ranges[row.name] = dataSelection;
         handle.filter(function (d) {
           return d.parent.name == row.name;
         }).attr('display', null).attr('transform', function (d, i) {
-          // console.log(this);
-          // console.log(d);
           return "translate(".concat(selection[i], ",", 0, ")");
-        }); //save brush state
-
-        var dataSelection = selection.map(x.invert);
-        this.__brush_selection = dataSelection;
+        }).select('.label').text(function (d, i) {
+          return xAxisLabelFormat(dataSelection[i]);
+        });
         group.filter(function (d) {
           return d.name == row.name;
         }).selectAll('.area').attr("d", function (d) {
@@ -356,7 +385,18 @@
         });
       }
 
-      listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection].concat(Array.prototype.slice.call(arguments)));
+      listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing]);
+      this.__brush_initializing = false;
+    }
+
+    function highlightVisible(ds) {
+      if (Object.values(ranges).length > 0) {
+        return !ds.some(function (d) {
+          return ranges[d.name] ? d.value < ranges[d.name][0] || d.value > ranges[d.name][1] : true;
+        });
+      } else {
+        return true;
+      }
     }
 
     return chart;

@@ -14,7 +14,8 @@ export default function (){
 		satScale = d3.scaleLinear().domain([0,pickerSize]).range([0, 1]).clamp(true),
 		lumScale = d3.scaleLinear().domain([pickerSize, 0]).range([0, 1]).clamp(true),
 		hue=360, sat=0.5, lum=0.5,
-        gradient = 'linear-gradient(180deg,red,#ff0,#0f0,#0ff,#00f,#f0f,red)',
+		gradient = 'linear-gradient(180deg,red,#ff0,#0f0,#0ff,#00f,#f0f,red)',
+		slGradient = color=>`linear-gradient(to top, rgb(0, 0, 0), transparent), linear-gradient(to left, ${color}, rgb(255, 255, 255))`,
         hueDrag = d3.drag()
         .on("drag", ()=>{
             hueHandleMoved(d3.event.y);
@@ -42,7 +43,7 @@ export default function (){
                 .style('padding-left', '15px')
                 .style('border-radius', '4px')
                 .style('box-shadow', '0px 1px 3px 0px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 2px 1px -1px rgba(0,0,0,0.12)')
-                .style('transform', 'translate(-50%,30%)')
+                .style('transform', 'translate(-50%,10px)')
                 .style('background-color', '#fff')
                 .style('z-index', '999');
                 // .style('align-items', 'center');
@@ -68,8 +69,10 @@ export default function (){
 			slPickerElm = slPickerGroup.append("div")
 				.style("width", `${pickerSize}px`)
 				.style("height", `${pickerSize}px`)
+				.style("border", '1px solid #eeeee')
 				.style('background-color', d3.hsl(hue, 1.0, 0.5))
 				.style("background-image", "linear-gradient(180deg, white, rgba(255,255,255,0) 50%),linear-gradient(0deg, black, rgba(0,0,0,0) 50%),linear-gradient(90deg, gray, rgba(128,128,128,0))")
+				// .style("background", slGradient(d3.hsl(hue, 1.0, 0.5)))
 				.on('click', clickSlArea)
 				
 			slHandleElm = slPickerGroup.append('div')
@@ -123,8 +126,10 @@ export default function (){
 				.style('outline', 'none')
 				.style('border', 'none')
 				.style('color', '#757575')
+				.style('font-size', '12px')
 				.style('border-radius', '4px')
 				.style('background', '#eeeeee')
+				.attr('spellcheck', 'false')
 				.attr('value', d3.hsl(hue, sat, lum))
 				.on('input', textChanged);
 
@@ -218,6 +223,7 @@ export default function (){
 		};
 		updateHueHandle(hueScale.invert(hsl.h?hsl.h:hue), true);
 		updateSlHandle(sl, true);
+		listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),...arguments]);
 	}
 	function pickerclose(){
         picker.hide();
@@ -240,7 +246,7 @@ export default function (){
     }
     function hueHandleEnd(loc){
         updateHueHandle(loc);
-        listeners.apply("handlemove", this, [d3.hsl(hue, sat, lum),loc,'hue',...arguments]);
+        listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,'hue',...arguments]);
 	}
 	function slHandleMoved(loc){
 		updateSlHandle(loc);
@@ -255,7 +261,8 @@ export default function (){
 
 		hueHandleElm.style('top', `${hueScale.invert(hue)}px`)
 			.style('background-color', d3.hsl(hue, 1.0, 0.5));
-		slPickerElm.style("background-color", d3.hsl(hue, 1.0, 0.5));
+
+		slPickerElm.style('background-color', d3.hsl(hue, 1.0, 0.5))
 
 		slHandleElm.style('background-color', d3.hsl(hue, sat, lum));
 		if (!dontUpdateText){
