@@ -21,13 +21,13 @@
           x = d3Scale.scaleLinear(),
           y = d3Scale.scalePoint(),
           z = d3Scale.scaleLog(),
-          tz = 1,
+          tz = null,
           ridge = d3Shape.area().curve(d3Shape.curveLinear).defined(function (d) {
         return !isNaN(d);
       }).x(function (d, i) {
         return x(data.bins[i]);
       }).y0(0).y1(function (d) {
-        return z(d + tz / 2);
+        return z(d + tz);
       }),
           crossridge = d3Shape.line().x(function (d) {
         return x(d.value);
@@ -92,12 +92,11 @@
           return d3Array.min(d.values.filter(function (v) {
             return v > 0;
           }));
-        }); // non-zero min /2 
+        }) / 2; // non-zero min /2 
 
-        z.domain([tz / 2, d3Array.max(data.series, function (d) {
+        z.domain([tz, d3Array.max(data.series, function (d) {
           return d3Array.max(d.values);
-        }) + tz / 2]).range([0, -overlap * y.step()]);
-        console.log('z domain', z.domain()); //axis
+        }) + tz]).range([0, -overlap * y.step()]); //axis
 
         var yAxisGroup = visarea.select('.y.axis');
 
