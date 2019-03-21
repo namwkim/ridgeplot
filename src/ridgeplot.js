@@ -1,6 +1,6 @@
 import {event, select} from 'd3-selection';
 // import {schemeBlues} from 'd3-scale-chromatic';
-import {scalePoint, scaleLinear} from 'd3-scale';
+import {scalePoint, scaleSqrt, scaleLinear} from 'd3-scale';
 import {axisLeft, axisBottom} from 'd3-axis';
 import {max, extent, bisectLeft} from 'd3-array';
 import {area, line, curveLinear} from 'd3-shape';
@@ -25,7 +25,7 @@ export default function(){
         step = 30,
         x = scaleLinear(),
         y = scalePoint(),
-        z = scaleLinear(),
+        z = scaleSqrt(),
         ridge = area()
             .curve(curveLinear)
             .defined(d => !isNaN(d))

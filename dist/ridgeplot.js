@@ -20,7 +20,7 @@
           step = 30,
           x = d3Scale.scaleLinear(),
           y = d3Scale.scalePoint(),
-          z = d3Scale.scaleLinear(),
+          z = d3Scale.scaleSqrt(),
           ridge = d3Shape.area().curve(d3Shape.curveLinear).defined(function (d) {
         return !isNaN(d);
       }).x(function (d, i) {
