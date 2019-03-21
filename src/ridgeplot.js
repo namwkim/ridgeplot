@@ -1,8 +1,8 @@
 import {event, select} from 'd3-selection';
 // import {schemeBlues} from 'd3-scale-chromatic';
-import {scalePoint, scaleSqrt, scaleLinear} from 'd3-scale';
+import {scalePoint, scaleLog, scaleLinear} from 'd3-scale';
 import {axisLeft, axisBottom} from 'd3-axis';
-import {max, extent, bisectLeft} from 'd3-array';
+import {min, max, extent, bisectLeft} from 'd3-array';
 import {area, line, curveLinear} from 'd3-shape';
 import {format} from 'd3-format';
 import {brushX} from 'd3-brush';
@@ -25,13 +25,14 @@ export default function(){
         step = 30,
         x = scaleLinear(),
         y = scalePoint(),
-        z = scaleSqrt(),
+		z = scaleLog(),
+		tz = 1,
         ridge = area()
             .curve(curveLinear)
             .defined(d => !isNaN(d))
             .x((d, i) => x(data.bins[i]))
             .y0(0)
-            .y1(d => z(d)),
+            .y1(d =>z(d+tz/2)),
         crossridge = line()
             .x(d=>x(d.value))
             .y(d=>y(d.name)),
@@ -111,11 +112,11 @@ export default function(){
         x.domain(extent(data.bins))
             .range([margin.left, width - margin.right]);
         y.domain(data.series.map(d => d.name))
-            .range([margin.top, height - margin.bottom]);
-        z.domain([0, max(data.series, d => max(d.values))]).nice()
-            // .base(10)
-            .range([0, -overlap * y.step()]);
-        
+			.range([margin.top, height - margin.bottom]);
+		tz = min(data.series, d => min(d.values.filter(v=>v>0))); // non-zero min /2 
+		z.domain([tz/2, max(data.series, d => max(d.values))+tz/2])
+			.range([0, -overlap * y.step()]);
+		console.log('z domain', z.domain());
         //axis
         let yAxisGroup = visarea.select('.y.axis');
         if (yAxisGroup.empty()) {
@@ -340,6 +341,11 @@ export default function(){
         if (!arguments.length) return y;
         y = value;
         return chart;
+	};
+	chart.z = function(value) {
+        if (!arguments.length) return z;
+        z = value;
+        return chart;
     };
     chart.overlap = function(value) {
         if (!arguments.length) return overlap;
@@ -372,7 +378,7 @@ export default function(){
     };
     function selectrow(d){
         this.__selected = this.__selected?false:true;
-        console.log(d);
+        // console.log(d);
         select(this)
             .attr('font-weight', this.__selected?'bold':'normal')
             .attr('fill', this.__selected?'#000':'#9e9e9e');

@@ -145,7 +145,7 @@
 				
 				if (status){
 					selections.push(name);
-					console.log('status', status, name);
+					// console.log('status', status, name);
 					d3.selectAll('.color-transfer')
 						.filter(d=>d.parent.name==name)
 						.attr('display', null)
@@ -159,7 +159,7 @@
 				console.log(selections);
 			}
 			function brushmove(range, pixelRange, row){
-				console.log(pixelRange);
+				// console.log(pixelRange);
 				if (pixelRange){
 					d3.selectAll('.color-transfer')
 						.filter(d=>d.parent.name==row.name)
@@ -175,7 +175,7 @@
 				// 	.style('top', d3.event.sourceEvent.clientY+'px');
 			}
 			function brushend(dataRange, pixelRange, row){
-				console.log('brush-end', pixelRange, row);
+				// console.log('brush-end', pixelRange, row);
 				if (pixelRange){
 					d3.selectAll('.color-transfer')
 						.filter(d=>d.parent.name==row.name)
