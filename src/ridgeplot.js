@@ -1,6 +1,6 @@
 import {event, select} from 'd3-selection';
 // import {schemeBlues} from 'd3-scale-chromatic';
-import {scalePoint, scaleLinear} from 'd3-scale';
+import {scalePoint, scaleSqrt, scaleLinear} from 'd3-scale';
 import {axisLeft, axisBottom} from 'd3-axis';
 import {max, extent, bisectLeft} from 'd3-array';
 import {area, line, curveLinear} from 'd3-shape';
@@ -21,12 +21,11 @@ export default function(){
         },
         data = null,
         responsive = false,
-        selectable = true,
         overlap = 0.9,
         step = 30,
         x = scaleLinear(),
         y = scalePoint(),
-        z = scaleLinear(),
+        z = scaleSqrt(),
         ridge = area()
             .curve(curveLinear)
             .defined(d => !isNaN(d))
@@ -41,16 +40,19 @@ export default function(){
         brushEnabled = true,
         onBrushMove = null,
 		onBrushEnd = null,
-		xAxisLabelFormat = null,
+		xAxisLabelFormat = format(',.0f'),
 		yAxisLabelFormat = null,
         listeners = dispatch('brushmove', 'brushend', 'selectrow'),
-        selections = [],
+        ranges = {},
         brush = brushX()
             .on("brush", brushmove)
             .on("end", brushend),
         highlights = null,
+        exponent = 0.025,
+        // highlightScale = scalePow().exponent(-0.5). range([1]),
         handle = null,
-        group = null;
+        group = null,
+        highlightGroup = null;;
 
 
 
@@ -73,8 +75,21 @@ export default function(){
                 .attr("class", "overlay")
                 .attr('fill', 'none');
 
-            svg.append('g')
-                
+            var gradient = svg.append("defs")
+                .append("linearGradient")
+                  .attr("id", "knobGradient")
+                  .attr("x1", "0%")
+                  .attr("y1", "0%")
+                  .attr("x2", "100%")
+                  .attr("y2", "100%");
+              
+              gradient.append("stop")
+                  .attr("offset", "0%")
+                  .attr("stop-color", "#fff");
+              
+              gradient.append("stop")
+                  .attr("offset", "100%")
+                  .attr("stop-color", "#eee");
 		}
         const visarea = svg.select('.visarea');
         const overlay = svg.select('.overlay');
@@ -98,6 +113,7 @@ export default function(){
         y.domain(data.series.map(d => d.name))
             .range([margin.top, height - margin.bottom]);
         z.domain([0, max(data.series, d => max(d.values))]).nice()
+            // .base(10)
             .range([0, -overlap * y.step()]);
         
         //axis
@@ -106,9 +122,19 @@ export default function(){
             yAxisGroup = visarea.append('g')
                 .attr('class', 'y axis');
         }
-        yAxisGroup.attr("transform", `translate(${selectable?margin.left-24:margin.left},0)`)
-            .call(axisLeft(y).tickSize(0).tickPadding(4))
+        yAxisGroup.attr("transform", `translate(${margin.left-5},0)`)
+            .call(axisLeft(y).tickSize(0).tickPadding(4).tickFormat(yAxisLabelFormat))
             .call(g => g.select(".domain").remove())
+
+        yAxisGroup.selectAll('.tick > text')
+            .attr('fill', function(){ 
+                return this.__selected?'#000':'#9e9e9e';
+            })
+            .attr('font-weight', function(){
+                return this.__selected?'bold':'normal'
+            })
+            .attr('cursor', 'pointer')
+            .on('click', selectrow);
 
         let xAxisGroup = visarea.select('.x.axis');
         if (xAxisGroup.empty()) {
@@ -118,8 +144,15 @@ export default function(){
         xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
             .call(axisBottom(x)
             .ticks(width / 80)
-            .tickSizeOuter(0));
-        
+            .tickSizeOuter(0)
+            .tickFormat(xAxisLabelFormat));
+        xAxisGroup.selectAll('.tick')
+            .select('line')
+            .attr('stroke', '#9e9e9e')
+        xAxisGroup.selectAll('.tick').select('text')
+            .attr('fill', '#9e9e9e');
+
+
         // console.log('x,y,z',x.domain(),y.domain(),z.domain());
         group = visarea.selectAll(".group")
             .data(data.series)
@@ -134,7 +167,7 @@ export default function(){
             .attr('class', 'area')
             .attr("fill", "#ddd")
             .attr("d", d=>{
-                return ridge(d.values)
+                return ridge(d.values);
             });
         
         let line = ridge.lineY1();
@@ -146,22 +179,6 @@ export default function(){
             .attr("stroke", "black")
             .attr("d", d => line(d.values));
         
-        if (selectable = true){
-            group.selectAll('.checkbox')
-                .data(d=>[d])
-                .join(
-                    enter=>enter.append("foreignObject")
-                        .attr('class', 'checkbox')
-                        .attr('x', margin.left-24)
-                        .attr('y', -10)
-                        .attr('width', 24)
-                        .attr('height', 24)
-                        .append("xhtml:input")
-                        .attr("type", "checkbox")
-                        .attr("name", d=>d.name)
-                        .on('change', selectrow)
-                );
-        }
         if (group.select('.focus').empty() && hoverEnabled){
             foci = group.append('g')
             .attr("class", "focus")
@@ -188,18 +205,19 @@ export default function(){
             group.select('.focus').remove();
             overlay.attr('pointer-events', 'none');
         }
-  
         // visualize highlights
-        if (highlights){
-            visarea.selectAll('.crossridge')
+        if (highlights && highlights.length>0){
+            // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+            highlightGroup = visarea.selectAll('.crossridge')
                 .data(highlights)
                 .join('path')
                 .attr('class', 'crossridge')
                 .attr("fill", "none")
-                .attr('stroke-opacity', 0.5)
+                .attr('stroke-opacity', d=>highlightVisible(d) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0)//highlightScale.domain([1, highlights.length])(highlights.length))
                 .attr("stroke", "#FFA500")
                 .attr("d", d => crossridge(d));
         }
+
         // brush
         if (brushEnabled && group.select('.brush').empty()){
             group.append('g')
@@ -213,24 +231,47 @@ export default function(){
         group.select('.brush').call(brush);
 
         //brush customize
-
         handle = group.select('.brush')
             .selectAll(".handle--custom")
             .data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
-            .join('path')
+            .join('g')
             .attr("class", "handle--custom")
             .attr('display', 'none')
-            .attr("cursor", "ew-resize")
-            .attr('fill', '#eee')
+            .attr("cursor", "ew-resize");
+
+        handle.selectAll('.label')
+            .data(d=>[d])
+            .join('text')
+            .attr('class', 'label')
+            .attr('fill', '#757575')
+            .attr('visibility',  'hidden')
+            .attr('font-size', '9px')
+            .attr('font-family', 'arial')
+            .attr('alignment-baseline', 'baseline')
+            .attr('text-anchor', 'middle')
+            .attr('dy', -(y.step()/4+1)+'px');
+        
+        handle.selectAll('.knob')
+            .data(d=>[d])
+            // .join('path')
+            .join('rect')
+            .attr('class', 'knob')
             .attr('stroke', '#757575')
+            .attr('fill', 'url(#knobGradient)')
+            .attr('x', -3)
+            .attr('y', -overlap*y.step()/4)
+            .attr('width', 6)
+            .attr('height', overlap*y.step()/2)
+            .attr('rx', 2)
+            .attr('rx', 2)
             // .attr('y0', 1)
             // .attr('y1', -overlap*y.step()+1); 
-            .attr("d", function(d) {
-                var e = +(d.type == "e"),
-                    dx = e ? 3 : -3,
-                    dy = overlap*y.step()/4;
-                return "M" + (dx) + "," + (-dy) +  "V" + ( dy) + "H" + (-dx) + "V"+  (- dy)+ "Z" + "M" + (0) + "," + (-dy + dy/2) + "V" + (dy - dy/2);
-            });
+            // .attr("d", function(d) {
+            //     var e = +(d.type == "e"),
+            //         dx = e ? 3 : -3,
+            //         dy = overlap*y.step()/4;
+            //     return "M" + (dx) + "," + (-dy) +  "V" + ( dy) + "H" + (-dx) + "V"+  (- dy)+ "Z" + "M" + (0) + "," + (-dy + dy/2) + "V" + (dy - dy/2);
+            // });
         
         // disable overlay brush
         group.select('.brush').select('.overlay')
@@ -243,9 +284,10 @@ export default function(){
             .attr('fill', null)
             .attr('stroke', null);
         group.select('.brush').each(function(d){
+            this.__brush_initializing = true;
             if (this.__brush_selection){
                 brush.move(select(this),this.__brush_selection.map(x));
-            }else{
+            }else{                
                 brush.move(select(this),extent(data.bins).map(x));
             }
         });
@@ -304,6 +346,11 @@ export default function(){
         overlap = value;
         return chart;
     };
+    chart.exponent = function(value) {
+        if (!arguments.length) return exponent;
+        exponent = value;
+        return chart;
+    };
     chart.brushEnabled = function(value){
         if (!arguments.length) return brushEnabled;
         brushEnabled = value;
@@ -324,7 +371,13 @@ export default function(){
         return value === listeners ? chart : value;
     };
     function selectrow(d){
-        listeners.apply("selectrow", this, [d.name, this.checked]);
+        this.__selected = this.__selected?false:true;
+        console.log(d);
+        select(this)
+            .attr('font-weight', this.__selected?'bold':'normal')
+            .attr('fill', this.__selected?'#000':'#9e9e9e');
+        
+        listeners.apply("selectrow", this, [d, this.__selected]);
     }
     function focusmove(){
         var x0 = x.invert(d3.mouse(this)[0]),
@@ -344,11 +397,15 @@ export default function(){
         if (selection==null){
             handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
         }else{
+            let dataSelection = selection.map(x.invert);
+            ranges[row.name] = dataSelection;
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', (d,i)=>{
                     return `translate(${selection[i]},${0})`
-                });
-            let dataSelection = selection.map(x.invert);
+                }).select('.label')
+                .attr('visibility',  'visible')
+                .text((d,i)=>xAxisLabelFormat(dataSelection[i]));
+            
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
                     let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
@@ -356,27 +413,33 @@ export default function(){
                     ridge.defined((d,i)=>i>=sidx && i<eidx);
                     return ridge(d.values);
                 });
+            if (highlights && highlights.length>0){
+                // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+                highlightGroup
+                    .attr('stroke-opacity',d=>highlightVisible(d)? Math.pow(highlights.length, -exponent):0.0);
+            }
         }
-        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, ...arguments]);
+        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
         // console.log('brushmove');
     }
     function brushend(row){
         
         let selection = event.selection;
         if (selection==null){
-            // console.log('nulllllll')
-            // handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
             brush.move(select(this),extent(data.bins).map(x));
         }else{
-            handle.filter(d=>d.parent.name==row.name).attr('display', null)
-                .attr('transform', function(d,i){
-                    // console.log(this);
-                    // console.log(d);
-                    return `translate(${selection[i]},${0})`
-                });
             //save brush state
             let dataSelection = selection.map(x.invert);
             this.__brush_selection = dataSelection;
+            ranges[row.name] = dataSelection;
+
+            handle.filter(d=>d.parent.name==row.name).attr('display', null)
+                .attr('transform', function(d,i){
+                    return `translate(${selection[i]},${0})`
+                }).select('.label')
+                .attr('visibility',  'hidden')
+                .text((d,i)=>xAxisLabelFormat(dataSelection[i]));
+
 
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
@@ -386,7 +449,16 @@ export default function(){
                     return ridge(d.values);
                 });
         }
-        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, ...arguments]);        
+        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
+        this.__brush_initializing = false;
+        
+    }
+    function highlightVisible(ds){
+        if (Object.values(ranges).length>0){
+            return !ds.some(d=>ranges[d.name]? (d.value<ranges[d.name][0]|| d.value > ranges[d.name][1]):true);
+        }else{
+            return true;
+        }
     }
 
 
