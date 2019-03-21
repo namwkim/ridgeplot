@@ -43,7 +43,7 @@
           ranges = {},
           brush = d3Brush.brushX().on("brush", brushmove).on("end", brushend),
           highlights = null,
-          exponent = 0.025,
+          exponent = 0.0025,
           // highlightScale = scalePow().exponent(-0.5). range([1]),
       handle = null,
           group = null,
@@ -361,7 +361,7 @@
           if (highlights && highlights.length > 0) {
             // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
             highlightGroup.attr('stroke-opacity', function (d) {
-              return highlightVisible(d) ? Math.pow(highlights.length, -exponent) : 0.0;
+              return highlightVisible(d) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
             });
           }
         }
