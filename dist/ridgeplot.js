@@ -153,10 +153,12 @@
         if (highlights && highlights.length > 0) {
           // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
           highlightGroup = visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr('stroke-opacity', function (d) {
-            return highlightVisible(d) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
+            return highlightVisible(d.values) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
           }) //highlightScale.domain([1, highlights.length])(highlights.length))
-          .attr("stroke", "#FFA500").attr("d", function (d) {
-            return crossridge(d);
+          .attr("stroke", function (d) {
+            return d.color ? d.color : "#FFA500";
+          }).attr("d", function (d) {
+            return crossridge(d.values);
           });
         } // brush
 
@@ -361,7 +363,7 @@
           if (highlights && highlights.length > 0) {
             // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
             highlightGroup.attr('stroke-opacity', function (d) {
-              return highlightVisible(d) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
+              return highlightVisible(d.values) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
             });
           }
         }

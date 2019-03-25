@@ -58,10 +58,14 @@
 						let columns = data.columns;
                         data = _.sampleSize(data, data.length/100);
 						cells = _.sampleSize(data, 10);
-						cells = cells.map(cell=>Object.keys(cell).map(key=>{
+						cells = cells.map(cell=>{
+							return {
+								color:'#cc0000', 
+								values:Object.keys(cell).map(key=>{
 							// let name = key.slice(0,key.length-6);
-							return {name:key, value:+cell[key]};
-						}));
+								return {name:key, value:+cell[key]};
+							})};
+						});
 						console.time('kde_sampled');
 						let x = d3.scaleLinear().domain([0, 65535]).nice(40);
 						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(120));

@@ -214,9 +214,9 @@ export default function(){
                 .join('path')
                 .attr('class', 'crossridge')
                 .attr("fill", "none")
-                .attr('stroke-opacity', d=>highlightVisible(d) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0)//highlightScale.domain([1, highlights.length])(highlights.length))
-                .attr("stroke", "#FFA500")
-                .attr("d", d => crossridge(d));
+                .attr('stroke-opacity', d=>highlightVisible(d.values) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0)//highlightScale.domain([1, highlights.length])(highlights.length))
+                .attr("stroke", d=>d.color?d.color:"#FFA500")
+                .attr("d", d => crossridge(d.values));
         }
 
         // brush
@@ -422,7 +422,7 @@ export default function(){
             if (highlights && highlights.length>0){
                 // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
                 highlightGroup
-                    .attr('stroke-opacity',d=>highlightVisible(d) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0);
+                    .attr('stroke-opacity',d=>highlightVisible(d.values) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0);
             }
         }
         listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);

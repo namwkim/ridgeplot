@@ -237,13 +237,13 @@
 	    function clickHueBar(){
 			let loc = d3.mouse(this)[1];
 	        updateHueHandle(loc);
-	        listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,...arguments]);
+	        listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,'hue',...arguments]);
 		}
 		function clickSlArea(){
 			let loc = d3.mouse(this);
 			loc = {x:loc[0], y:loc[1]};
 			updateSlHandle(loc);
-	        listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,...arguments]);
+	        listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,'sl',...arguments]);
 	    }
 	    function hueHandleMoved(loc){
 			updateHueHandle(loc);
@@ -255,11 +255,11 @@
 		}
 		function slHandleMoved(loc){
 			updateSlHandle(loc);
-			listeners.apply("handlemove", this, [d3.hsl(hue, sat, lum),loc,'hue',...arguments]);
+			listeners.apply("handlemove", this, [d3.hsl(hue, sat, lum),loc,'sl',...arguments]);
 		}
 		function slHandleEnd(loc){
 			updateSlHandle(loc);
-			listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,'hue',...arguments]);
+			listeners.apply("handleend", this, [d3.hsl(hue, sat, lum),loc,'sl',...arguments]);
 		}
 	    function updateHueHandle(loc, dontUpdateText=false){
 			hue = hueScale(loc);
