@@ -425,7 +425,7 @@ export default function(){
                     .attr('stroke-opacity',d=>highlightVisible(d.values) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0);
             }
         }
-        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
+        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing, ranges]);
         // console.log('brushmove');
     }
     function brushend(row){
@@ -455,7 +455,7 @@ export default function(){
                     return ridge(d.values);
                 });
         }
-        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing]);
+        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing, ranges]);
         this.__brush_initializing = false;
         
     }

@@ -34,8 +34,16 @@
 	        })
 	        .on("end", ()=>{
 	            slHandleEnd(d3.event);
-	        }),
-	        listeners = d3.dispatch('handlemove', 'handleend', 'close');
+			}),
+			drag = d3.drag()
+				.on("drag", ()=>{
+					let dx = d3.event.dx;
+					let dy = d3.event.dy;
+					container
+					.style('left', parseInt(container.style('left'), 10) + dx+'px')
+					.style('top', parseInt(container.style('top'), 10) + dy+'px');
+				}),
+	        listeners = d3.dispatch('handlemove', 'handleend', 'save', 'close');
 	        
 	    function picker(selection){
 	        
@@ -50,7 +58,8 @@
 	                .style('box-shadow', '0px 1px 3px 0px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 2px 1px -1px rgba(0,0,0,0.12)')
 	                .style('transform', 'translate(-50%,10px)')
 	                .style('background-color', '#fff')
-	                .style('z-index', '999');
+					.style('z-index', '999')
+					.call(drag);
 	                // .style('align-items', 'center');
 				pickerGroup = container.append('div')
 					.attr("class", "picker-group")
@@ -127,7 +136,7 @@
 					.style('display', 'flex')
 					.style('margin-top', '10px');
 				inputElm = bottomGroup.append('input')
-					.style("width", `${pickerSize}px`)
+					.style("width", `${pickerSize-25}px`)
 					.style('outline', 'none')
 					.style('border', 'none')
 					.style('color', '#757575')
@@ -139,6 +148,28 @@
 					.on('input', textChanged);
 
 				bottomGroup.append('div')
+	                .attr('class', 'save')
+					.style('cursor', 'pointer')
+					.style('text-align', 'center')
+	                // .style('font-family', 'Arial, Helvetica, sans-serif')
+	                .style('border-radius', '50%')
+	                // .style('font-size', '12px')
+	                .style('margin-left', '5px')
+					.style('width', '24px')
+					.style('height', '24px')
+					.style('background-repeat', 'no-repeat')
+					.style('background-image','url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDUxMS45OTkgNTExLjk5OSIgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgNTExLjk5OSA1MTEuOTk5OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGNsYXNzPSIiPjxnPjxnPgoJPGc+CgkJPHBhdGggZD0iTTUwNi4yMzEsNzUuNTA4Yy03LjY4OS03LjY5LTIwLjE1OC03LjY5LTI3Ljg0OSwwbC0zMTkuMjEsMzE5LjIxMUwzMy42MTcsMjY5LjE2M2MtNy42ODktNy42OTEtMjAuMTU4LTcuNjkxLTI3Ljg0OSwwICAgIGMtNy42OSw3LjY5LTcuNjksMjAuMTU4LDAsMjcuODQ5bDEzOS40ODEsMTM5LjQ4MWM3LjY4Nyw3LjY4NywyMC4xNiw3LjY4OSwyNy44NDksMGwzMzMuMTMzLTMzMy4xMzYgICAgQzUxMy45MjEsOTUuNjY2LDUxMy45MjEsODMuMTk4LDUwNi4yMzEsNzUuNTA4eiIgZGF0YS1vcmlnaW5hbD0iIzAwMDAwMCIgY2xhc3M9ImFjdGl2ZS1wYXRoIiBzdHlsZT0iZmlsbDojOUU5RTlFIiBkYXRhLW9sZF9jb2xvcj0iIzllOWU5ZSI+PC9wYXRoPgoJPC9nPgo8L2c+PC9nPiA8L3N2Zz4=)')
+					.style('background-size', '12px')
+					.style('background-position', 'center')
+	                .on('mouseenter',function(){
+	                    d3.select(this).style('background-color', '#eee');
+	                })
+	                .on('mouseleave',function(){
+	                    d3.select(this).style('background-color', null);
+	                })
+					.on('click', pickersave);
+					
+				bottomGroup.append('div')
 	                .attr('class', 'close')
 					.style('cursor', 'pointer')
 					.style('text-align', 'center')
@@ -149,7 +180,7 @@
 					.style('width', '24px')
 					.style('height', '24px')
 					.style('background-repeat', 'no-repeat')
-					.style('background-image','url(data:image/svg+xml;utf8;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNTEycHgiIHZlcnNpb249IjEuMSIgaGVpZ2h0PSI1MTJweCIgdmlld0JveD0iMCAwIDY0IDY0IiBlbmFibGUtYmFja2dyb3VuZD0ibmV3IDAgMCA2NCA2NCI+CiAgPGc+CiAgICA8cGF0aCBmaWxsPSIjOWU5ZTllIiBkPSJNMjguOTQxLDMxLjc4NkwwLjYxMyw2MC4xMTRjLTAuNzg3LDAuNzg3LTAuNzg3LDIuMDYyLDAsMi44NDljMC4zOTMsMC4zOTQsMC45MDksMC41OSwxLjQyNCwwLjU5ICAgYzAuNTE2LDAsMS4wMzEtMC4xOTYsMS40MjQtMC41OWwyOC41NDEtMjguNTQxbDI4LjU0MSwyOC41NDFjMC4zOTQsMC4zOTQsMC45MDksMC41OSwxLjQyNCwwLjU5YzAuNTE1LDAsMS4wMzEtMC4xOTYsMS40MjQtMC41OSAgIGMwLjc4Ny0wLjc4NywwLjc4Ny0yLjA2MiwwLTIuODQ5TDM1LjA2NCwzMS43ODZMNjMuNDEsMy40MzhjMC43ODctMC43ODcsMC43ODctMi4wNjIsMC0yLjg0OWMtMC43ODctMC43ODYtMi4wNjItMC43ODYtMi44NDgsMCAgIEwzMi4wMDMsMjkuMTVMMy40NDEsMC41OWMtMC43ODctMC43ODYtMi4wNjEtMC43ODYtMi44NDgsMGMtMC43ODcsMC43ODctMC43ODcsMi4wNjIsMCwyLjg0OUwyOC45NDEsMzEuNzg2eiIvPgogIDwvZz4KPC9zdmc+Cg==)')
+					.style('background-image','url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDUxMi4wMDEgNTEyLjAwMSIgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgNTEyLjAwMSA1MTIuMDAxOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiPjxnPjxnPgoJPGc+CgkJPHBhdGggZD0iTTUwNS45MjIsNDc2LjU2N0wyODUuMzU1LDI1Nkw1MDUuOTIsMzUuNDM1YzguMTA2LTguMTA1LDguMTA2LTIxLjI0OCwwLTI5LjM1NGMtOC4xMDUtOC4xMDYtMjEuMjQ4LTguMTA2LTI5LjM1NCwwICAgIEwyNTYuMDAxLDIyNi42NDZMMzUuNDM0LDYuMDgxYy04LjEwNS04LjEwNi0yMS4yNDgtOC4xMDYtMjkuMzU0LDBjLTguMTA2LDguMTA1LTguMTA2LDIxLjI0OCwwLDI5LjM1NEwyMjYuNjQ2LDI1Nkw2LjA4LDQ3Ni41NjcgICAgYy04LjEwNiw4LjEwNi04LjEwNiwyMS4yNDgsMCwyOS4zNTRjOC4xMDUsOC4xMDUsMjEuMjQ4LDguMTA2LDI5LjM1NCwwbDIyMC41NjctMjIwLjU2N2wyMjAuNTY3LDIyMC41NjcgICAgYzguMTA1LDguMTA1LDIxLjI0OCw4LjEwNiwyOS4zNTQsMFM1MTQuMDI4LDQ4NC42NzMsNTA1LjkyMiw0NzYuNTY3eiIgZGF0YS1vcmlnaW5hbD0iIzAwMDAwMCIgY2xhc3M9ImFjdGl2ZS1wYXRoIiBzdHlsZT0iZmlsbDojOUU5RTlFIiBkYXRhLW9sZF9jb2xvcj0iIzllOWU5ZSI+PC9wYXRoPgoJPC9nPgo8L2c+PC9nPiA8L3N2Zz4=)')
 					.style('background-size', '12px')
 					.style('background-position', 'center')
 	                .on('mouseenter',function(){
@@ -232,8 +263,12 @@
 		}
 		function pickerclose(){
 	        picker.hide();
-	        listeners.apply("close", this, [...arguments]);
-	    }
+			listeners.apply("close", this, [d3.hsl(hue, sat, lum),...arguments]);
+		}
+		function pickersave(){
+			picker.hide();
+	        listeners.apply("save", this, [d3.hsl(hue, sat, lum),...arguments]);
+		}
 	    function clickHueBar(){
 			let loc = d3.mouse(this)[1];
 	        updateHueHandle(loc);

@@ -22,8 +22,10 @@
 				let colorPicker = picker();
 				let colorTransferHandle = null;
 
-				colorPicker.on('handlemove', handlemove)
-					.on('handleend', handleend)
+				colorPicker
+					// .on('handlemove', handlemove)
+					// .on('handleend', handleend)
+					.on('save', handleend)
 					.on('close', ()=>colorTransferHandle=null);
 				d3.select(document.body).call(colorPicker);//add it to body
 				let cells = JSON.parse(localStorage.getItem('cells'));
@@ -33,7 +35,7 @@
 					console.log('used cached data...', visdata, cells);
 					visualize(visdata);
 				}else{
-					const promise = d3.csv("./segResultsRF.csv");//, ({name, date, total_1, total_2}) => ({name, date: date * 1000, value: +total_1 + +total_2}));
+					const promise = d3.csv("./nuclei_quantification_C057.csv");//, ({name, date, total_1, total_2}) => ({name, date: date * 1000, value: +total_1 + +total_2}));
 					// console.log(promise);
 					promise.then((data)=>{
 						console.log(data);
@@ -55,21 +57,31 @@
 						// 	return d3.max(data.map(function(d){  return +d[key]; }));							
 						// }));
 						// console.log('min, max', min, max);
-						let columns = data.columns;
+						// let columns = data.columns;
+						let filterKeys = key=>key!='id'&&key!='cluster'&&key!='NucleusArea'&&
+							key!='Area'&&key!='CytoRingMask'&&key!='ImageId'&&key!='Eccentricity'&&key!='Solidity'&&key!='Extent'&&key!='EulerNumber'&&key!='Perimeter'&&key!='MajorAxisLength'&&key!='MinorAxisLength'&&key!='Orientation';
+						let columns = data.columns.filter(filterKeys);
+						console.log(columns)
+						let extent = d3.extent(columns.reduce((acc, key)=>{
+							let values = data.map(function(d){  return +d[key]; });
+							return acc.concat(values);
+							// console.log(key, d3.extent(values));
+						},[]));
                         data = _.sampleSize(data, data.length/100);
 						cells = _.sampleSize(data, 10);
 						cells = cells.map(cell=>{
 							return {
 								color:'#cc0000', 
-								values:Object.keys(cell).map(key=>{
+								values:Object.keys(cell).filter(filterKeys).map(key=>{
 							// let name = key.slice(0,key.length-6);
 								return {name:key, value:+cell[key]};
 							})};
 						});
+						console.log('extent', extent, cells);
 						console.time('kde_sampled');
-						let x = d3.scaleLinear().domain([0, 65535]).nice(40);
+						let x = d3.scaleLinear().domain(extent).nice(120);
 						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(120));
-						
+						console.log(kde, x.ticks(120))
 						let allDensity = columns.map(key=>{
                             let values = data.map(function(d){  return +d[key]; });
                             console.log(key, d3.extent(values));
@@ -113,7 +125,12 @@
 
 					console.log(plot.overlap(),'overlap')
 					// add group
-					d3.selectAll('.group')
+					container.select('svg').selectAll(".group-overlay")
+						.data(visdata.series)
+						.join("g")
+						.attr('class', 'group-overlay')
+						.attr("transform", d => `translate(0,${plot.y()(d.name) + 1})`)
+					// d3.selectAll('.group')
             			.selectAll(".color-transfer")
 						.data(d=>[{parent:d,type: "w"}, {parent:d,type: "e"}])
 						.join(
@@ -121,8 +138,8 @@
 							.attr("class", "color-transfer")
 							.attr('display', 'none')
 							.attr("cursor", "pointer")
-							.attr('stroke', 'white')
-							.attr('fill', 'black')
+							.attr('stroke', '#757575')
+							.attr('fill', d=>d.type=='w'?'black':'white')
 							.attr('width', 10)
 							.attr('height', 10)
 							.attr('rx', 2)
@@ -162,8 +179,7 @@
 				}
 				console.log(selections);
 			}
-			function brushmove(range, pixelRange, row){
-				// console.log(pixelRange);
+			function brushmove(range, pixelRange, row, initializing, allRanges){
 				if (pixelRange){
 					d3.selectAll('.color-transfer')
 						.filter(d=>d.parent.name==row.name)
@@ -197,8 +213,8 @@
 			function handlemove(color, x){
 				console.log('handlemove', color, x);
 			}
-			function handleend(color, x){
-				console.log('handleend', color, x);
+			function handleend(color){
+				console.log('handleend', color);
 				colorTransferHandle.style('fill', color);
 			}
 			function onShowColorPicker(){

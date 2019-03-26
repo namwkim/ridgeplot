@@ -368,7 +368,7 @@
           }
         }
 
-        listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing]); // console.log('brushmove');
+        listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing, ranges]); // console.log('brushmove');
       }
 
       function brushend(row) {
@@ -404,7 +404,7 @@
           });
         }
 
-        listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing]);
+        listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing, ranges]);
         this.__brush_initializing = false;
       }
 
