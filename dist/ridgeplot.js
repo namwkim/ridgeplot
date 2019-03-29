@@ -16,21 +16,20 @@
       },
           data = null,
           responsive = false,
-          overlap = 0.9,
+          overlap = 0.7,
           step = 30,
-          x = d3Scale.scaleLinear(),
-          y = d3Scale.scalePoint(),
-          z = d3Scale.scaleLog(),
-          tz = null,
+          xs = [],
+          // multiple x-scales
+      // x = scaleLinear(),
+      y = d3Scale.scalePoint(),
+          z = d3Scale.scaleSqrt(),
           ridge = d3Shape.area().curve(d3Shape.curveLinear).defined(function (d) {
         return !isNaN(d);
-      }).x(function (d, i) {
-        return x(data.bins[i]);
       }).y0(0).y1(function (d) {
-        return z(d + tz);
+        return z(d);
       }),
           crossridge = d3Shape.line().x(function (d) {
-        return x(d.value);
+        return xs[d.name](d.value);
       }).y(function (d) {
         return y(d.name);
       }),
@@ -43,7 +42,7 @@
           ranges = {},
           brush = d3Brush.brushX().on("brush", brushmove).on("end", brushend),
           highlights = null,
-          exponent = 0.0025,
+          exponent = 0.025,
           // highlightScale = scalePow().exponent(-0.5). range([1]),
       handle = null,
           group = null,
@@ -84,19 +83,18 @@
         } // scales
 
 
-        x.domain(d3Array.extent(data.bins)).range([margin.left, width - margin.right]);
+        xs = data.series.reduce(function (acc, d) {
+          acc[d.name] = d3Scale.scaleLinear().domain(d3Array.extent(d.bins)).range([margin.left, width - margin.right]);
+          return acc;
+        }, {}); // x.domain(extent(data.bins))
+        //     .range([margin.left, width - margin.right]);
+
         y.domain(data.series.map(function (d) {
           return d.name;
         })).range([margin.top, height - margin.bottom]);
-        tz = d3Array.min(data.series, function (d) {
-          return d3Array.min(d.values.filter(function (v) {
-            return v > 0;
-          }));
-        }) / 2; // non-zero min /2 
-
-        z.domain([tz, d3Array.max(data.series, function (d) {
+        z.domain([0, d3Array.max(data.series, function (d) {
           return d3Array.max(d.values);
-        }) + tz]).range([0, -overlap * y.step()]); //axis
+        })]).range([0, -overlap * y.step()]); //axis
 
         var yAxisGroup = visarea.select('.y.axis');
 
@@ -111,16 +109,22 @@
           return this.__selected ? '#000' : '#9e9e9e';
         }).attr('font-weight', function () {
           return this.__selected ? 'bold' : 'normal';
-        }).attr('cursor', 'pointer').on('click', selectrow);
-        var xAxisGroup = visarea.select('.x.axis');
-
-        if (xAxisGroup.empty()) {
-          xAxisGroup = visarea.append('g').attr('class', 'x axis');
-        }
-
-        xAxisGroup.attr("transform", "translate(0,".concat(height - margin.bottom, ")")).call(d3Axis.axisBottom(x).ticks(width / 80).tickSizeOuter(0).tickFormat(xAxisLabelFormat));
-        xAxisGroup.selectAll('.tick').select('line').attr('stroke', '#9e9e9e');
-        xAxisGroup.selectAll('.tick').select('text').attr('fill', '#9e9e9e'); // console.log('x,y,z',x.domain(),y.domain(),z.domain());
+        }).attr('cursor', 'pointer').on('click', selectrow); // let xAxisGroup = visarea.select('.x.axis');
+        // if (xAxisGroup.empty()) {
+        //     xAxisGroup = visarea.append('g')
+        //         .attr('class', 'x axis');
+        // }
+        // xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
+        //     .call(axisBottom(x)
+        //     .ticks(width / 80)
+        //     .tickSizeOuter(0)
+        //     .tickFormat(xAxisLabelFormat));
+        // xAxisGroup.selectAll('.tick')
+        //     .select('line')
+        //     .attr('stroke', '#9e9e9e')
+        // xAxisGroup.selectAll('.tick').select('text')
+        //     .attr('fill', '#9e9e9e');
+        // console.log('x,y,z',x.domain(),y.domain(),z.domain());
 
         group = visarea.selectAll(".group").data(data.series).join("g").attr('class', 'group').attr("transform", function (d) {
           return "translate(0,".concat(y(d.name) + 1, ")");
@@ -129,14 +133,39 @@
         group.selectAll('.area').data(function (d) {
           return [d];
         }).join("path").attr('class', 'area').attr("fill", "#ddd").attr("d", function (d) {
+          ridge.x(function (v, i) {
+            return xs[d.name](d.bins[i]);
+          });
           return ridge(d.values);
         });
-        var line = ridge.lineY1();
         group.selectAll('.line').data(function (d) {
           return [d];
         }).join("path").attr('class', 'line').attr("fill", "none").attr("stroke", "black").attr("d", function (d) {
+          ridge.x(function (v, i) {
+            return xs[d.name](d.bins[i]);
+          });
+          var line = ridge.lineY1();
           return line(d.values);
         });
+        group.selectAll('.xaxis').data(function (d) {
+          return [d];
+        }).join('g').attr('class', 'xaxis') // .attr("transform", `translate(0,${height - margin.bottom})`)
+        .each(function (d) {
+          d3Selection.select(this).call(d3Axis.axisBottom(xs[d.name]).tickValues(xs[d.name].domain()).tickSize(4) // .tickSizeOuter(0)
+          .tickFormat(xAxisLabelFormat));
+        }); // let xAxisGroup = visarea.select('.x.axis');
+        // if (xAxisGroup.empty()) {
+        //     xAxisGroup = visarea.append('g')
+        //         .attr('class', 'x axis');
+        // }
+        // xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
+        //     .call(axisBottom(x)
+        //     .ticks(width / 80)
+        //     .tickSizeOuter(0)
+        //     .tickFormat(xAxisLabelFormat));
+
+        group.selectAll('.xaxis').selectAll('.tick').select('line').attr('stroke', '#9e9e9e');
+        group.selectAll('.xaxis').selectAll('.tick').select('text').attr('fill', '#9e9e9e');
 
         if (group.select('.focus').empty() && hoverEnabled) {
           foci = group.append('g').attr("class", "focus").style("display", "none"); // console.log(foci);
@@ -150,8 +179,8 @@
         } // visualize highlights
 
 
-        if (highlights && highlights.length > 0) {
-          // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+        if (highlights) {
+          // console.log('highlights.length', highlights);
           highlightGroup = visarea.selectAll('.crossridge').data(highlights).join('path').attr('class', 'crossridge').attr("fill", "none").attr('stroke-opacity', function (d) {
             return highlightVisible(d.values) ? Math.max(0.025, 1.0 / (highlights.length / 10)) : 0.0;
           }) //highlightScale.domain([1, highlights.length])(highlights.length))
@@ -204,9 +233,9 @@
           this.__brush_initializing = true;
 
           if (this.__brush_selection) {
-            brush.move(d3Selection.select(this), this.__brush_selection.map(x));
+            brush.move(d3Selection.select(this), this.__brush_selection.map(xs[d.name]));
           } else {
-            brush.move(d3Selection.select(this), d3Array.extent(data.bins).map(x));
+            brush.move(d3Selection.select(this), d3Array.extent(d.bins).map(xs[d.name]));
           }
         });
         overlay.attr("width", width).attr("height", height).on("mouseover", function () {
@@ -336,7 +365,7 @@
             return d.parent.name == row.name;
           }).attr('display', 'none');
         } else {
-          var dataSelection = selection.map(x.invert);
+          var dataSelection = selection.map(xs[row.name].invert);
           ranges[row.name] = dataSelection;
           handle.filter(function (d) {
             return d.parent.name == row.name;
@@ -348,13 +377,15 @@
           group.filter(function (d) {
             return d.name == row.name;
           }).selectAll('.area').attr("d", function (d) {
-            var sidx = data.bins.findIndex(function (value) {
+            var sidx = row.bins.findIndex(function (value) {
               return value >= dataSelection[0];
             });
-            var eidx = data.bins.length - data.bins.slice().reverse().findIndex(function (value) {
+            var eidx = row.bins.length - row.bins.slice().reverse().findIndex(function (value) {
               return value <= dataSelection[1];
             });
-            ridge.defined(function (d, i) {
+            ridge.x(function (v, i) {
+              return xs[d.name](d.bins[i]);
+            }).defined(function (d, i) {
               return i >= sidx && i < eidx;
             });
             return ridge(d.values);
@@ -368,17 +399,17 @@
           }
         }
 
-        listeners.apply("brushmove", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing, ranges]); // console.log('brushmove');
+        listeners.apply("brushmove", this, [selection ? selection.map(xs[row.name].invert) : null, selection, row, this.__brush_initializing, ranges]); // console.log('brushmove');
       }
 
       function brushend(row) {
         var selection = d3Selection.event.selection;
 
         if (selection == null) {
-          brush.move(d3Selection.select(this), d3Array.extent(data.bins).map(x));
+          brush.move(d3Selection.select(this), d3Array.extent(row.bins).map(x));
         } else {
           //save brush state
-          var dataSelection = selection.map(x.invert);
+          var dataSelection = selection.map(xs[row.name].invert);
           this.__brush_selection = dataSelection;
           ranges[row.name] = dataSelection;
           handle.filter(function (d) {
@@ -391,20 +422,22 @@
           group.filter(function (d) {
             return d.name == row.name;
           }).selectAll('.area').attr("d", function (d) {
-            var sidx = data.bins.findIndex(function (value) {
+            var sidx = row.bins.findIndex(function (value) {
               return value >= dataSelection[0];
             });
-            var eidx = data.bins.length - data.bins.slice().reverse().findIndex(function (value) {
+            var eidx = row.bins.length - row.bins.slice().reverse().findIndex(function (value) {
               return value <= dataSelection[1];
             });
-            ridge.defined(function (d, i) {
+            ridge.x(function (v, i) {
+              return xs[d.name](d.bins[i]);
+            }).defined(function (d, i) {
               return i >= sidx && i < eidx;
             });
             return ridge(d.values);
           });
         }
 
-        listeners.apply("brushend", this, [selection ? selection.map(x.invert) : null, selection, row, this.__brush_initializing, ranges]);
+        listeners.apply("brushend", this, [selection ? selection.map(xs[row.name].invert) : null, selection, row, this.__brush_initializing, ranges]);
         this.__brush_initializing = false;
       }
 

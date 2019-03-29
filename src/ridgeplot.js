@@ -1,6 +1,6 @@
 import {event, select} from 'd3-selection';
 // import {schemeBlues} from 'd3-scale-chromatic';
-import {scalePoint, scaleLog, scaleLinear} from 'd3-scale';
+import {scalePoint, scaleSqrt, scaleLinear} from 'd3-scale';
 import {axisLeft, axisBottom} from 'd3-axis';
 import {min, max, extent, bisectLeft} from 'd3-array';
 import {area, line, curveLinear} from 'd3-shape';
@@ -21,20 +21,19 @@ export default function(){
         },
         data = null,
         responsive = false,
-        overlap = 0.9,
+        overlap = 0.7,
         step = 30,
-        x = scaleLinear(),
+        xs = [], // multiple x-scales
+        // x = scaleLinear(),
         y = scalePoint(),
-		z = scaleLog(),
-		tz = null,
+		z = scaleSqrt(),
         ridge = area()
             .curve(curveLinear)
             .defined(d => !isNaN(d))
-            .x((d, i) => x(data.bins[i]))
             .y0(0)
-            .y1(d =>z(d+tz)),
+            .y1(d =>z(d)),
         crossridge = line()
-            .x(d=>x(d.value))
+            .x(d=>xs[d.name](d.value))
             .y(d=>y(d.name)),
         foci=null, 
         hoverEnabled = false,
@@ -49,11 +48,11 @@ export default function(){
             .on("brush", brushmove)
             .on("end", brushend),
         highlights = null,
-        exponent = 0.0025,
+        exponent = 0.025,
         // highlightScale = scalePow().exponent(-0.5). range([1]),
         handle = null,
         group = null,
-        highlightGroup = null;;
+        highlightGroup = null;
 
 
 
@@ -109,14 +108,18 @@ export default function(){
         }
 
         // scales
-        x.domain(extent(data.bins))
+        xs = data.series.reduce((acc,d)=>{
+            acc[d.name] = scaleLinear().domain(extent(d.bins))
             .range([margin.left, width - margin.right]);
+            return acc;
+        },{});
+        // x.domain(extent(data.bins))
+        //     .range([margin.left, width - margin.right]);
         y.domain(data.series.map(d => d.name))
-			.range([margin.top, height - margin.bottom]);
-
-		tz = min(data.series, d => min(d.values.filter(v=>v>0)))/2; // non-zero min /2 
-		z.domain([tz, max(data.series, d => max(d.values))+tz])
-			.range([0, -overlap * y.step()]);
+            .range([margin.top, height - margin.bottom]);
+        
+		z.domain([0, max(data.series, d => max(d.values))])
+            .range([0, -overlap * y.step()]);
         //axis
         let yAxisGroup = visarea.select('.y.axis');
         if (yAxisGroup.empty()) {
@@ -137,21 +140,21 @@ export default function(){
             .attr('cursor', 'pointer')
             .on('click', selectrow);
 
-        let xAxisGroup = visarea.select('.x.axis');
-        if (xAxisGroup.empty()) {
-            xAxisGroup = visarea.append('g')
-                .attr('class', 'x axis');
-        }
-        xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
-            .call(axisBottom(x)
-            .ticks(width / 80)
-            .tickSizeOuter(0)
-            .tickFormat(xAxisLabelFormat));
-        xAxisGroup.selectAll('.tick')
-            .select('line')
-            .attr('stroke', '#9e9e9e')
-        xAxisGroup.selectAll('.tick').select('text')
-            .attr('fill', '#9e9e9e');
+        // let xAxisGroup = visarea.select('.x.axis');
+        // if (xAxisGroup.empty()) {
+        //     xAxisGroup = visarea.append('g')
+        //         .attr('class', 'x axis');
+        // }
+        // xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
+        //     .call(axisBottom(x)
+        //     .ticks(width / 80)
+        //     .tickSizeOuter(0)
+        //     .tickFormat(xAxisLabelFormat));
+        // xAxisGroup.selectAll('.tick')
+        //     .select('line')
+        //     .attr('stroke', '#9e9e9e')
+        // xAxisGroup.selectAll('.tick').select('text')
+        //     .attr('fill', '#9e9e9e');
 
 
         // console.log('x,y,z',x.domain(),y.domain(),z.domain());
@@ -168,18 +171,53 @@ export default function(){
             .attr('class', 'area')
             .attr("fill", "#ddd")
             .attr("d", d=>{
+                ridge.x((v,i) => xs[d.name](d.bins[i]));
                 return ridge(d.values);
             });
         
-        let line = ridge.lineY1();
         group.selectAll('.line')
             .data(d=>[d])
             .join("path")
             .attr('class', 'line')
             .attr("fill", "none")
             .attr("stroke", "black")
-            .attr("d", d => line(d.values));
+            .attr("d", d => {
+                ridge.x((v,i) => xs[d.name](d.bins[i]));
+                let line = ridge.lineY1();
+                return line(d.values);
+            });
         
+        group.selectAll('.xaxis')
+            .data(d=>[d])
+            .join('g')
+            .attr('class', 'xaxis')
+            // .attr("transform", `translate(0,${height - margin.bottom})`)
+            .each(function(d){
+                select(this).call(axisBottom(xs[d.name])
+                .tickValues(xs[d.name].domain())
+                .tickSize(4)
+                // .tickSizeOuter(0)
+                .tickFormat(xAxisLabelFormat));
+            });
+            
+
+        // let xAxisGroup = visarea.select('.x.axis');
+        // if (xAxisGroup.empty()) {
+        //     xAxisGroup = visarea.append('g')
+        //         .attr('class', 'x axis');
+        // }
+        // xAxisGroup.attr("transform", `translate(0,${height - margin.bottom})`)
+        //     .call(axisBottom(x)
+        //     .ticks(width / 80)
+        //     .tickSizeOuter(0)
+        //     .tickFormat(xAxisLabelFormat));
+        group.selectAll('.xaxis').selectAll('.tick')
+            .select('line')
+            .attr('stroke', '#9e9e9e')
+        group.selectAll('.xaxis').selectAll('.tick').select('text')
+            .attr('fill', '#9e9e9e');
+
+
         if (group.select('.focus').empty() && hoverEnabled){
             foci = group.append('g')
             .attr("class", "focus")
@@ -207,8 +245,8 @@ export default function(){
             overlay.attr('pointer-events', 'none');
         }
         // visualize highlights
-        if (highlights && highlights.length>0){
-            // console.log('highlights.length', highlights.length, Math.pow(highlights.length, -exponent));
+        if (highlights){
+            // console.log('highlights.length', highlights);
             highlightGroup = visarea.selectAll('.crossridge')
                 .data(highlights)
                 .join('path')
@@ -287,9 +325,9 @@ export default function(){
         group.select('.brush').each(function(d){
             this.__brush_initializing = true;
             if (this.__brush_selection){
-                brush.move(select(this),this.__brush_selection.map(x));
+                brush.move(select(this),this.__brush_selection.map(xs[d.name]));
             }else{                
-                brush.move(select(this),extent(data.bins).map(x));
+                brush.move(select(this),extent(d.bins).map(xs[d.name]));
             }
         });
 
@@ -403,7 +441,7 @@ export default function(){
         if (selection==null){
             handle.filter(d=>d.parent.name==row.name).attr('display', 'none');
         }else{
-            let dataSelection = selection.map(x.invert);
+            let dataSelection = selection.map(xs[row.name].invert);
             ranges[row.name] = dataSelection;
             handle.filter(d=>d.parent.name==row.name).attr('display', null)
                 .attr('transform', (d,i)=>{
@@ -414,9 +452,11 @@ export default function(){
             
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
-                    let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
-                    let eidx = data.bins.length - data.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
-                    ridge.defined((d,i)=>i>=sidx && i<eidx);
+                    let sidx = row.bins.findIndex(value=>value>=dataSelection[0]);
+                    let eidx = row.bins.length - row.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
+                    
+                    ridge.x((v,i) => xs[d.name](d.bins[i]))
+                        .defined((d,i)=>i>=sidx && i<eidx);
                     return ridge(d.values);
                 });
             if (highlights && highlights.length>0){
@@ -425,17 +465,17 @@ export default function(){
                     .attr('stroke-opacity',d=>highlightVisible(d.values) ? Math.max(0.025, 1.0/(highlights.length/10)) : 0.0);
             }
         }
-        listeners.apply("brushmove", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing, ranges]);
+        listeners.apply("brushmove", this, [selection?selection.map(xs[row.name].invert):null,selection, row, this.__brush_initializing, ranges]);
         // console.log('brushmove');
     }
     function brushend(row){
         
         let selection = event.selection;
         if (selection==null){
-            brush.move(select(this),extent(data.bins).map(x));
+            brush.move(select(this),extent(row.bins).map(x));
         }else{
             //save brush state
-            let dataSelection = selection.map(x.invert);
+            let dataSelection = selection.map(xs[row.name].invert);
             this.__brush_selection = dataSelection;
             ranges[row.name] = dataSelection;
 
@@ -449,13 +489,14 @@ export default function(){
 
             group.filter(d=>d.name==row.name).selectAll('.area')
                 .attr("d", d=>{
-                    let sidx = data.bins.findIndex(value=>value>=dataSelection[0]);
-                    let eidx = data.bins.length - data.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
-                    ridge.defined((d,i)=>i>=sidx && i<eidx);
+                    let sidx = row.bins.findIndex(value=>value>=dataSelection[0]);
+                    let eidx = row.bins.length - row.bins.slice().reverse().findIndex(value=>value<=dataSelection[1]);
+                    ridge.x((v,i) => xs[d.name](d.bins[i]))
+                        .defined((d,i)=>i>=sidx && i<eidx);
                     return ridge(d.values);
                 });
         }
-        listeners.apply("brushend", this, [selection?selection.map(x.invert):null,selection, row, this.__brush_initializing, ranges]);
+        listeners.apply("brushend", this, [selection?selection.map(xs[row.name].invert):null,selection, row, this.__brush_initializing, ranges]);
         this.__brush_initializing = false;
         
     }

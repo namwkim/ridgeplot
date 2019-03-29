@@ -14,6 +14,7 @@
 				let plot = ridgeplot();
 				plot
 					.responsive(true)
+					.xAxisLabelFormat(d3.format(",.2f"))
 					.yAxisLabelFormat(d=>d.split('_')[0])
 					// .xAxisLabelFormat(d=>parseInt(d))
 					.on('selectrow',selectrow)
@@ -30,7 +31,7 @@
 				d3.select(document.body).call(colorPicker);//add it to body
 				let cells = JSON.parse(localStorage.getItem('cells'));
 				if (visdata){
-					// cells = _.sampleSize(cells, 5);
+					cells = _.sampleSize(cells, 3);
 					// cells.forEach(cell=>cell.forEach(d=>d.value=+d.value));
 					console.log('used cached data...', visdata, cells);
 					visualize(visdata);
@@ -58,11 +59,11 @@
 						// }));
 						// console.log('min, max', min, max);
 						// let columns = data.columns;
-						let filterKeys = key=>key!='id'&&key!='cluster'&&key!='NucleusArea'&&
+						let filterKeys = key=>key!='id'&&key!='cluster'&&key!='NucleusArea'&&key!='CellPosition_X'&&key!='CellPosition_Y'&&
 							key!='Area'&&key!='CytoRingMask'&&key!='ImageId'&&key!='Eccentricity'&&key!='Solidity'&&key!='Extent'&&key!='EulerNumber'&&key!='Perimeter'&&key!='MajorAxisLength'&&key!='MinorAxisLength'&&key!='Orientation';
 						let columns = data.columns.filter(filterKeys);
-						console.log(columns)
-						let extent = d3.extent(columns.reduce((acc, key)=>{
+						// console.log(columns)
+						let globalExtent = d3.extent(columns.reduce((acc, key)=>{
 							let values = data.map(function(d){  return +d[key]; });
 							return acc.concat(values);
 							// console.log(key, d3.extent(values));
@@ -77,23 +78,28 @@
 								return {name:key, value:+cell[key]};
 							})};
 						});
-						console.log('extent', extent, cells);
+						
 						console.time('kde_sampled');
-						let x = d3.scaleLinear().domain(extent).nice(120);
-						let kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(120));
-						console.log(kde, x.ticks(120))
+						// let x = d3.scaleLinear().domain(extent).nice(120);
+						
+						
+						console.log(globalExtent)
 						let allDensity = columns.map(key=>{
-                            let values = data.map(function(d){  return +d[key]; });
-                            console.log(key, d3.extent(values));
+							let values = data.map(function(d){  return +d[key]; });
+							let extent = d3.extent(values);
+							let x = d3.scaleLinear().domain(extent).nice(80);
+							console.log(x.domain());//(globalExtent[1]-globalExtent[0])/20
+							let kde = kernelDensityEstimator(kernelEpanechnikov((extent[1]-extent[0])/20), x.ticks(80));
 							let density =  kde( values,parseInt(values.length));
 							return {key, density};
 						})
 						visdata =  {
 							series: allDensity.map(({key, density}) => ({
 							name: key,
-							values: density.map(d =>d[1])
+							values: density.map(d =>d[1]),
+							bins:density.map(d =>d[0])
 							})),
-							bins:allDensity[0].density.map(d=>d[0])
+							// bins:allDensity[0].density.map(d=>d[0])
 						};
 						// visdata.series.forEach(d => d.name = d.name.slice(0,d.name.length-6));
 						console.log('saving data...', visdata, cells);
